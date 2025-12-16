@@ -17,6 +17,7 @@ type BuscarNotasParams = {
   clienteId: string
   accessToken: string
   refreshToken: string
+  endOverride?: number
 }
 
 export async function buscarNotasMercadoLivre(
@@ -33,7 +34,9 @@ export async function buscarNotasMercadoLivre(
   } = mercadolivreConfig
 
   const startDate = calculateDate(MERCADOLIVRE_DAYS_TO_FETCH)
-  const endDate = calculateDate(MERCADOLIVRE_END_TO_FETCH)
+  const endDate = calculateDate(
+    params.endOverride ?? mercadolivreConfig.MERCADOLIVRE_END_TO_FETCH
+  )
 
   const url =
     `https://api.mercadolibre.com/users/${clienteId}` +

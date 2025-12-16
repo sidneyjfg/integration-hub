@@ -14,49 +14,103 @@ services:
 
     environment:
       # =====================================================
-      # 🌐 CONFIGURAÇÃO GLOBAL DO HUB (por cliente)
+      # 🌐 CONFIGURAÇÃO GLOBAL DO HUB
+      # (coreEnvSchema)
       # =====================================================
-
+      PORT: 3000
       TZ: America/Sao_Paulo
 
-      # 🔌 Integrações ativas neste cliente (anymarket,plugg,trayCorp,mercado livre)
-      ACTIVE_INTEGRATIONS: anymarket
+      # Integrações ativas (separadas por vírgula)
+      # Ex: anymarket,mercadolivre,pluggto,traycorp
+      ACTIVE_INTEGRATIONS:
 
-      # ⏱️ Crons globais (ativam apenas hubs compatíveis)
+      # ⏱️ CRONS
       CRON_PEDIDOS: "05 23 * * *"
-      # CRON_PRODUTOS: ""
-      # CRON_NOTAS_ML: ""
+      # CRON_PRODUTOS:
+      CRON_NOTAS_ML: "10 01 * * *"
+      # CRON_NOTAS_SFTP:
 
       # 📣 Notificação global
-      GOOGLE_CHAT_WEBHOOK_URL: https://chat.googleapis.com/v1/spaces/XXXX/messages?key=XXX&token=XXX
+      GOOGLE_CHAT_WEBHOOK_URL: 
 
       # =====================================================
-      # 🗄️ BANCO DE DADOS (GLOBAL – muda por cliente)
+      # 🗄️ BANCO DE DADOS (GLOBAL)
       # =====================================================
+      DB_HOST_MONITORAMENTO:
+      DB_PORT_MONITORAMENTO:
+      DB_USER_MONITORAMENTO:
+      DB_PASS_MONITORAMENTO:
 
-      DB_HOST_MONITORAMENTO: 127.0.0.1
-      DB_PORT_MONITORAMENTO: 3306
-      DB_USER_MONITORAMENTO: eacadm
-      DB_PASS_MONITORAMENTO: P0s1t1vo@N3ruS!2023!
+      DB_NAME_MONITORAMENTO:
+      DB_NAME_DADOS:
 
-      # Bases
-      DB_NAME_MONITORAMENTO: sqlmonitoramento   # temp_*
-      DB_NAME_DADOS: sqldados                   # leitura apenas
-
-      # 🟢 ANYMARKET — CONFIGURAÇÃO DO HUB
+      # =====================================================
+      # 🟢 ANYMARKET
+      # (anymarketEnvSchema)
+      # =====================================================
       ANYMARKET_URL: https://api.anymarket.com.br
-      ANYMARKET_GUMGATOKEN:
+      ANYMARKET_GUMGATOKEN: ""
       ANYMARKET_DAYS_TO_FETCH: 1
-      CONVENCIONAL: 1
-      FULFILLMENT: 1
-      NO_LOOK_STATUS_TYPE:
-      NERUS_NOTIFICATION_URL:
-      NERUS_OI:
+
+      FULFILLMENT: "1"
+      CONVENCIONAL: "1"
+      NO_LOOK_STATUS_TYPE: ""
+
+      NERUS_NOTIFICATION_URL: ""
+      NERUS_RECEIVE_NOTIFICATION_URL: ""
+      NERUS_OI: ""
       SELLER: Default Seller
 
-      # 🟢 PluggTo — CONFIGURAÇÃO DO HUB
+      # =====================================================
+      # 🟡 MERCADO LIVRE
+      # (mercadolivreEnvSchema)
+      # =====================================================
+      MERCADOLIVRE_CLIENT_ID:
+      MERCADOLIVRE_CLIENT_SECRET:
 
-      # 🟢 TrayCorp — CONFIGURAÇÃO DO HUB
+      # Tokens separados por vírgula (1 para cada CLIENTE_ID)
+      MERCADOLIVRE_ACCESS_TOKEN:
 
-      # 🟢 Mecado Livre — CONFIGURAÇÃO DO HUB
+      MERCADOLIVRE_REFRESH_TOKEN:
 
+      MERCADOLIVRE_CLIENTE_ID:
+      MERCADOLIVRE_STORENOS: 
+
+      MERCADOLIVRE_DAYS_TO_FETCH: 
+      MERCADOLIVRE_END_TO_FETCH:
+      MERCADOLIVRE_END_SFTP:
+      MERCADOLIVRE_IGNORE_SERIE:
+      MERCADOLIVRE_MAX_RETRY_COUNT: 5000
+
+      MERCADOLIVRE_DISPONIBILIZA_XML_DIVERGENTE:
+
+      MERCADOLIVRE_SFTP_ENABLED:
+      MERCADOLIVRE_SFTP_DIR:
+      MERCADOLIVRE_USE_LEDGER:
+
+      MERCADOLIVRE_SFTP_IGNORE_END_FILE:
+      MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA:
+
+      MERCADOLIVRE_IS_VONDER:
+      MERCADOLIVRE_SFTP_UID:
+      MERCADOLIVRE_SFTP_GID:
+
+      # =====================================================
+      # 🔵 PLUGGTO
+      # (pluggtoEnvSchema)
+      # =====================================================
+      PLUGGTO_URL: https://api.plugg.to
+      PLUGGTO_CLIENT_ID: ""
+      PLUGGTO_CLIENT_SECRET: ""
+      PLUGGTO_USERNAME: ""
+      PLUGGTO_PASSWORD: ""
+      DAYS_TO_FETCH: "1"
+      STORENO: "1"
+      NERUS_RECEIVE_ORDER_URL: https://nerus.com.br/api/receive-order
+
+      # =====================================================
+      # 🟣 TRAYCORP
+      # (traycorpEnvSchema)
+      # =====================================================
+      TRAY_URL: https://api.tray.com.br
+      TRAY_TOKEN: ""

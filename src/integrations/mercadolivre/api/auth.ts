@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios'
 import { notifyGoogleChat } from '../notifications/google-chat'
+import { sendNotificationEmail } from '../notifications/email'
 
 // import { sendNotificationEmail } from '../../notifications/email'
 
@@ -63,8 +64,7 @@ export async function refreshAccessToken(
       )
 
       // 📧 email com passo a passo (como você descreveu)
-    //   await sendNotificationEmail(clienteId)
-
+      await sendNotificationEmail(clienteId) //mensagem deve conter nome do cliente e conta Id e o 
     } else {
       console.error(
         '[MERCADOLIVRE][AUTH ERROR] Falha ao atualizar o token',

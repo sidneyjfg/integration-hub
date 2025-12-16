@@ -11,6 +11,7 @@ const toBool = (v: unknown) => {
 }
 
 export const mercadolivreEnvSchema = z.object({
+    CLIENT_NAME: z.string().optional(),
     // 🔐 Credenciais Mercado Livre
     MERCADOLIVRE_CLIENT_ID: z.string().min(1),
     MERCADOLIVRE_CLIENT_SECRET: z.string().min(1),
@@ -26,6 +27,7 @@ export const mercadolivreEnvSchema = z.object({
     // ⏱️ Período de busca
     MERCADOLIVRE_DAYS_TO_FETCH: z.coerce.number().min(1),
     MERCADOLIVRE_END_TO_FETCH: z.coerce.number().min(0).default(0),
+    MERCADOLIVRE_END_SFTP: z.coerce.number().min(0).default(0),
     // ⚠️ Comportamentos opcionais
     MERCADOLIVRE_DISPONIBILIZA_XML_DIVERGENTE: z.preprocess(toBool, z.boolean()).default(false),
 
