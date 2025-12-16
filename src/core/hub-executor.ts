@@ -4,7 +4,7 @@ import type { CoreEnv } from './env.schema'
 export async function executarCronPorHub(
   hub: string,
   coreConfig: CoreEnv,
-  tipo: 'pedidos' | 'produtos' | 'notas'
+  tipo: 'pedidos' | 'produtos' | 'notas' | 'sftp'
 ) {
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -25,6 +25,9 @@ export async function executarCronPorHub(
 
     if (tipo === 'notas' && hubCron.executarCronNotas) {
       await hubCron.executarCronNotas(coreConfig)
+    }
+    if (tipo === 'sftp' && hubCron.executarCronNotas) {
+      await hubCron.executarCronSFTP(coreConfig)
     }
   } catch (err) {
     console.error(`[CRON] Erro ao executar cron do hub ${hub}:`, err)

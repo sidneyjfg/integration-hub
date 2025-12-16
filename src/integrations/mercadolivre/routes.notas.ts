@@ -31,7 +31,7 @@ export default async function (app: FastifyInstance) {
         `,
         [
           n.status,
-          n.venda_remesa,
+          n.venda_remessa,
           n.NFe,
           n.serie,
           n.nome,

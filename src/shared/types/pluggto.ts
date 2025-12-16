@@ -1,7 +1,7 @@
 export interface PluggtoOrderBody {
   ordnoweb: string
   ordnochannel: string
-  nfe_key?: string
+  nfe_key?: string | null
   date: string
   status: string
 }
@@ -12,7 +12,7 @@ export interface PluggtoProductBody {
   ean?: string
   name: string
   price: number
-  pricePromotion?: number
+  pricePromotion?: number | null
   stock?: number
 }
 

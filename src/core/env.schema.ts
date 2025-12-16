@@ -16,7 +16,7 @@ export const coreEnvSchema = z.object({
   CRON_PEDIDOS: z.string().optional(),
   CRON_PRODUTOS: z.string().optional(),
   CRON_NOTAS_ML: z.string().optional(),
-
+  CRON_NOTAS_SFTP: z.string().optional(),
   GOOGLE_CHAT_WEBHOOK_URL: z.string().url(),
   TZ: z.string().optional()
 })
