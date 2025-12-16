@@ -1,5 +1,5 @@
 import { ResultadoComparacaoPedido } from '../../../shared/types'
-import { config } from '../env.schema'
+import { anymarketConfig } from '../env.schema'
 
 export function montarPayloadPedidoNerus(
   pedido: ResultadoComparacaoPedido
@@ -10,7 +10,7 @@ export function montarPayloadPedidoNerus(
     type: 'ORDER',
     content: {
       id: pedido.ID_ANYMARKET,
-      oi: config.NERUS_OI
+      oi: anymarketConfig.NERUS_OI
     }
   }
 }

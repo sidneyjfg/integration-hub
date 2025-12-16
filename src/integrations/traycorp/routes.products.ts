@@ -1,11 +1,15 @@
 import { poolMonitoramento } from '../../core/db'
+import type { FastifyInstance, FastifyRequest } from 'fastify'
+import { TrayCorpProductBody } from '../../shared/types'
 
-export default async function (app) {
-  app.post('/', async (req) => {
-    const p = req.body as any
+export default async function (app: FastifyInstance) {
+  app.post(
+    '/', 
+async (req: FastifyRequest<{ Body: TrayCorpProductBody }>) => {
+      const p = req.body as any
 
-    await poolMonitoramento.execute(
-      `
+      await poolMonitoramento.execute(
+        `
       INSERT INTO temp_products (
         produtoVarianteId,
         produtoId,
@@ -27,28 +31,28 @@ export default async function (app) {
         raw_payload
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       `,
-      [
-        p.produtoVarianteId,
-        p.produtoId,
-        p.idPaiExterno,
-        p.sku,
-        p.nome,
-        p.nomeProdutoPai,
-        p.precoCusto,
-        p.precoDe,
-        p.precoPor,
-        p.ean,
-        p.centroDistribuicaoId,
-        p.estoqueFisico,
-        p.estoqueReservado,
-        p.alertaEstoque,
-        p.dataCriacao,
-        p.dataAtualizacao,
-        p.parentId,
-        JSON.stringify(p)
-      ]
-    )
+        [
+          p.produtoVarianteId,
+          p.produtoId,
+          p.idPaiExterno,
+          p.sku,
+          p.nome,
+          p.nomeProdutoPai,
+          p.precoCusto,
+          p.precoDe,
+          p.precoPor,
+          p.ean,
+          p.centroDistribuicaoId,
+          p.estoqueFisico,
+          p.estoqueReservado,
+          p.alertaEstoque,
+          p.dataCriacao,
+          p.dataAtualizacao,
+          p.parentId,
+          JSON.stringify(p)
+        ]
+      )
 
-    return { status: 'ok' }
-  })
+      return { status: 'ok' }
+    })
 }
