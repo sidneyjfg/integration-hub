@@ -1,0 +1,7 @@
+{
+  "watch": ["src"],
+  "ext": "ts,json",
+  "ignore": ["node_modules", "dist"],
+  "exec": "ts-node --transpile-only src/core/server.ts",
+  "signal": "SIGTERM"
+}

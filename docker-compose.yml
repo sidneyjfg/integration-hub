@@ -1,0 +1,62 @@
+version: '3.9'
+
+services:
+  integrations-hub:
+    image: ghcr.io/sidneyjfg/integrations-hub:latest
+    container_name: integrations-hub
+    restart: unless-stopped
+
+    ports:
+      - "3000:3000"
+
+    env_file:
+      - .env
+
+    environment:
+      # =====================================================
+      # 🌐 CONFIGURAÇÃO GLOBAL DO HUB (por cliente)
+      # =====================================================
+
+      TZ: America/Sao_Paulo
+
+      # 🔌 Integrações ativas neste cliente (anymarket,plugg,trayCorp,mercado livre)
+      ACTIVE_INTEGRATIONS: anymarket
+
+      # ⏱️ Crons globais (ativam apenas hubs compatíveis)
+      CRON_PEDIDOS: "05 23 * * *"
+      # CRON_PRODUTOS: ""
+      # CRON_NOTAS_ML: ""
+
+      # 📣 Notificação global
+      GOOGLE_CHAT_WEBHOOK_URL: https://chat.googleapis.com/v1/spaces/XXXX/messages?key=XXX&token=XXX
+
+      # =====================================================
+      # 🗄️ BANCO DE DADOS (GLOBAL – muda por cliente)
+      # =====================================================
+
+      DB_HOST_MONITORAMENTO: 127.0.0.1
+      DB_PORT_MONITORAMENTO: 3306
+      DB_USER_MONITORAMENTO: eacadm
+      DB_PASS_MONITORAMENTO: P0s1t1vo@N3ruS!2023!
+
+      # Bases
+      DB_NAME_MONITORAMENTO: sqlmonitoramento   # temp_*
+      DB_NAME_DADOS: sqldados                   # leitura apenas
+
+      # 🟢 ANYMARKET — CONFIGURAÇÃO DO HUB
+      ANYMARKET_URL: https://api.anymarket.com.br
+      ANYMARKET_GUMGATOKEN:
+      ANYMARKET_DAYS_TO_FETCH: 1
+      CONVENCIONAL: 1
+      FULFILLMENT: 1
+      NO_LOOK_STATUS_TYPE:
+      NERUS_NOTIFICATION_URL:
+      NERUS_OI:
+      SELLER: Default Seller
+
+      # 🟢 PluggTo — CONFIGURAÇÃO DO HUB
+
+      # 🟢 TrayCorp — CONFIGURAÇÃO DO HUB
+
+      # 🟢 Mecado Livre — CONFIGURAÇÃO DO HUB
+
