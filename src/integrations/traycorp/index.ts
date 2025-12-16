@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
-import products from './routes.products'
+import { registrarRotasProdutosTraycorp } from './routes.products'
 
 export async function register(app: FastifyInstance) {
-  app.register(products, { prefix: '/traycorp/products' })
+  app.register(registrarRotasProdutosTraycorp, { prefix: '/traycorp/products' })
 }
