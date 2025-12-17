@@ -1,17 +1,19 @@
 import path from 'path'
-
 import { mercadolivreConfig } from '../../env.schema'
 import { sendFilesViaSFTP } from '../../utils'
-import { filtrarPorIgnoreEndFile, filtrarPorTipoNota } from '../../utils'
+import {
+  filtrarPorIgnoreEndFile,
+  filtrarPorTipoNota
+} from '../../utils'
 
 /**
  * 🔵 Fluxo SFTP VONDER (fixo)
  * - Bucket IN / IN_EVENTOS / CTE
- * - Sem decisão dinâmica (cliente fixo)
+ * - Sem ledger
  */
 export async function executarSftpVonder(
   files: string[]
-): Promise<void> {
+): Promise<number> {
 
   const {
     MERCADOLIVRE_SFTP_DIR,
@@ -34,7 +36,7 @@ export async function executarSftpVonder(
 
   if (!filtrados.length) {
     console.log('[VONDER][SFTP] Nenhum arquivo após filtros')
-    return
+    return 0
   }
 
   // -----------------------------
@@ -51,11 +53,7 @@ export async function executarSftpVonder(
 
   const isCTe = (file: string) => {
     const n = file.toLowerCase()
-    return (
-      n.includes('cte') ||
-      n.includes('ct-e') ||
-      n.includes('proccte')
-    )
+    return n.includes('cte') || n.includes('ct-e') || n.includes('proccte')
   }
 
   const paraIN = filtrados.filter(
@@ -72,23 +70,26 @@ export async function executarSftpVonder(
     path.posix.join(MERCADOLIVRE_SFTP_DIR!, dir)
 
   if (paraIN.length) {
-    console.log('[VONDER][IN]', paraIN.length)
     await sendFilesViaSFTP(paraIN, join('IN'))
   }
 
   if (paraEVENTOS.length) {
-    console.log('[VONDER][IN_EVENTOS]', paraEVENTOS.length)
     await sendFilesViaSFTP(paraEVENTOS, join('IN_EVENTOS'))
   }
 
   if (paraCTE.length) {
-    console.log('[VONDER][CTE]', paraCTE.length)
     await sendFilesViaSFTP(paraCTE, join('CTE'))
   }
+
+  const totalEnviado =
+    paraIN.length + paraEVENTOS.length + paraCTE.length
 
   console.log('[VONDER][SFTP] Envio concluído', {
     IN: paraIN.length,
     EVENTOS: paraEVENTOS.length,
-    CTE: paraCTE.length
+    CTE: paraCTE.length,
+    TOTAL: totalEnviado
   })
+
+  return totalEnviado
 }

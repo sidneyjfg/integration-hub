@@ -13,7 +13,7 @@ export const sincronizarPedidosAnymarket = async (): Promise<void> => {
 
   try {
     const pedidos = await buscarPedidosRecentesAnymarket()
-
+    console.log("Pedidos depois de filtros")
     if (pedidos.length === 0) {
       console.log('[ANYMARKET][SYNC] Nenhum pedido encontrado')
       await notifyGoogleChat('Nenhum pedido encontrado no Anymarket.')

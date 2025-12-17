@@ -25,6 +25,10 @@ type BuscarNotasResult = {
   endDate: string
 }
 
+const delay = (ms: number) =>
+  new Promise(resolve => setTimeout(resolve, ms))
+
+
 export async function buscarNotasMercadoLivre(
   params: BuscarNotasParams
 ): Promise<BuscarNotasResult> {
@@ -131,13 +135,27 @@ export async function buscarNotasMercadoLivre(
     }
 
   } catch (error: any) {
+    const status = error?.response?.status
+
     console.error('[MERCADOLIVRE][BUSCA][ERRO]', {
       clienteId,
-      status: error?.response?.status,
+      status,
       message: error.message
     })
 
-    if (error?.response?.status === 401) {
+    // 🔁 429 → aguarda 3 minutos e tenta novamente
+    if (status === 429) {
+      console.warn('[MERCADOLIVRE][RATE LIMIT] 429 recebido. Aguardando 3 minutos para retry...', {
+        clienteId
+      })
+
+      await delay(3 * 60 * 1000) // 3 minutos
+
+      return buscarNotasMercadoLivre(params)
+    }
+
+    // 🔐 401 → refresh de token
+    if (status === 401) {
       console.log('[MERCADOLIVRE][AUTH] Token expirado, tentando refresh', {
         clienteId
       })
@@ -150,13 +168,12 @@ export async function buscarNotasMercadoLivre(
       })
 
       return buscarNotasMercadoLivre({
-        clienteId,
-        accessToken: newAccessToken,
-        refreshToken
+        ...params,
+        accessToken: newAccessToken
       })
     }
 
-    console.log('[MERCADOLIVRE][BUSCA] Retornando lista vazia por erro', {
+    console.log('[MERCADOLIVRE][BUSCA] Retornando lista vazia por erro não tratável', {
       clienteId
     })
 
@@ -166,4 +183,5 @@ export async function buscarNotasMercadoLivre(
       endDate
     }
   }
+
 }

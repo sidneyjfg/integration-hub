@@ -7,7 +7,7 @@ import { ledgerSimples } from '../ledger-simples'
 
 export async function executarSftpLedger(
   files: string[]
-): Promise<void> {
+): Promise<number> {
 
   const {
     MERCADOLIVRE_SFTP_DIR,
@@ -29,9 +29,12 @@ export async function executarSftpLedger(
     f => !ledgerSimples.jaEnviado(path.basename(f))
   )
 
-  if (!novos.length) return
+  if (!novos.length) return 0
 
   await sendFilesViaSFTP(novos, MERCADOLIVRE_SFTP_DIR)
 
   ledgerSimples.registrar(novos.map(f => path.basename(f)))
+
+  return novos.length
 }
+

@@ -82,14 +82,15 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         continue
       }
 
-      // 🚚 ENVIO
+      let enviados = 0
+
       switch (modo) {
         case 'LOCAL_SIMPLES':
           await executarLocalSimples(files)
           break
 
         case 'LOCAL_LEDGER':
-          await executarLocalLedger(files)
+          enviados = await executarLocalLedger(files)
           break
 
         case 'SFTP_SIMPLES':
@@ -97,11 +98,11 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
           break
 
         case 'SFTP_LEDGER':
-          await executarSftpLedger(files)
+          enviados = await executarSftpLedger(files)
           break
 
         case 'SFTP_VONDER':
-          await executarSftpVonder(files)
+          enviados = await executarSftpVonder(files)
           break
       }
 
