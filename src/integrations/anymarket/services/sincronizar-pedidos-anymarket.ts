@@ -41,12 +41,28 @@ export const sincronizarPedidosAnymarket = async (): Promise<void> => {
     )
 
     if (pedidosNaoIntegrados.length > 0) {
-      const mensagens = await reenviarPedidosAnymarketNaoIntegradosNerus(
-        pedidosNaoIntegrados
+      const listaNaoIntegrados = pedidosNaoIntegrados.map(p =>
+        `• ${p.ID_ANYMARKET} \n| ${p.MARKETPLACE} \n| ${p.STATUS_ANY}`
       )
 
-      await notifyGoogleChat(mensagens.join('\n'))
-    } else {
+      const mensagensReenvio =
+        await reenviarPedidosAnymarketNaoIntegradosNerus(
+          pedidosNaoIntegrados
+        )
+
+      const mensagemFinal = [
+        `⚠️ Pedidos não integrados encontrados: ${pedidosNaoIntegrados.length}`,
+        '',
+        '📋 Lista de pedidos não integrados:',
+        ...listaNaoIntegrados,
+        '',
+        '🔁 Resultado do reenvio:',
+        ...mensagensReenvio
+      ]
+
+      await notifyGoogleChat(mensagemFinal.join('\n'))
+    }
+    else {
       console.log('[ANYMARKET][SYNC] Todos os pedidos integrados')
 
       await notifyGoogleChat(

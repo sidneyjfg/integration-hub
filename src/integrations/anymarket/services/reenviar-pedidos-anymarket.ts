@@ -23,7 +23,7 @@ export const reenviarPedidosAnymarketNaoIntegradosNerus = async (
     for (const p of pedidos) {
       // mostra apenas os pedidos não integrados
       linhas.push(
-        `${p.DATA ?? ''} ID_ANYMARKET: ${p.ID_ANYMARKET} PEDIDO: ${p.PEDIDO} MARKETPLACE: ${p.MARKETPLACE}`
+        `${p.DATA ?? ''}\n ID_ANYMARKET: ${p.ID_ANYMARKET} \nPEDIDO: ${p.PEDIDO} \nMARKETPLACE: ${p.MARKETPLACE}`
       )
     }
 
