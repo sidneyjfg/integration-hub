@@ -37,6 +37,9 @@ export const mercadolivreEnvSchema = z.object({
     MERCADOLIVRE_SFTP_DIR: z.string().default(''),
     MERCADOLIVRE_USE_LEDGER: z.preprocess(toBool, z.boolean()).default(false),
     // 📁 Filtros SFTP
+    MERCADOLIVRE_SFTP_ORGANIZE_BY_DATE: z
+        .preprocess(toBool, z.boolean())
+        .default(false),
     MERCADOLIVRE_SFTP_IGNORE_END_FILE: z.string().optional().default(''),
     MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA: z.string().optional().default(''),
     MERCADOLIVRE_IGNORE_SERIE: z.string().optional().default(''),

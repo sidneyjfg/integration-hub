@@ -4,9 +4,11 @@ import { buscarNotasMercadoLivre } from '../api/buscar-notas-mercadolivre'
 import {
   filtrarPorIgnoreEndFile,
   filtrarPorTipoNota,
-  getAllXmlFiles
+  getAllXmlFiles,
+  calculateDate
 } from '../utils'
 import { notifyGoogleChat } from '../notifications/google-chat'
+import { buildMercadoLivreSftpNotification } from '../notifications/build-sftp-notification'
 import { mercadolivreConfig } from '../env.schema'
 
 import { resolverModoEnvio } from './resolve-modo-envio'
@@ -54,13 +56,17 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
     console.log('[MERCADOLIVRE][SFTP] Processando cliente', { clienteId })
 
     try {
-      const notas = await buscarNotasMercadoLivre({
+      const {
+        notas,
+        startDate,
+        endDate
+      } = await buscarNotasMercadoLivre({
         clienteId,
         accessToken,
         refreshToken,
-        // 🔥 override exclusivo para SFTP
         endOverride: mercadolivreConfig.MERCADOLIVRE_END_SFTP
       })
+
 
       let files = notas.map(n => n.filePath).filter(Boolean)
 
@@ -120,9 +126,18 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
           break
       }
 
-      await notifyGoogleChat(
-        `📤 Mercado Livre • Cliente ${clienteId} • ${files.length} XML(s) • modo ${modo}`
-      )
+      const notification = await buildMercadoLivreSftpNotification({
+        clienteId,
+        modo,
+        files,
+        startDate,
+        endDate,
+        ignoreTipo: mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA,
+        ignoreEnd: mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE,
+        targetDir: mercadolivreConfig.MERCADOLIVRE_SFTP_DIR
+      })
+
+      await notifyGoogleChat(notification)
 
     } catch (err) {
       console.error('[MERCADOLIVRE][SFTP] Erro ao processar cliente', {

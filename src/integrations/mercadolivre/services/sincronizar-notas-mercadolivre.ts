@@ -44,7 +44,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
       console.log('==============================')
 
       try {
-        const notas: MercadoLivreNotaBody[] =
+        const { notas } =
           await buscarNotasMercadoLivre({
             clienteId,
             accessToken,

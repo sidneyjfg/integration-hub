@@ -19,10 +19,16 @@ type BuscarNotasParams = {
   refreshToken: string
   endOverride?: number
 }
+type BuscarNotasResult = {
+  notas: MercadoLivreNotaBody[]
+  startDate: string
+  endDate: string
+}
 
 export async function buscarNotasMercadoLivre(
   params: BuscarNotasParams
-): Promise<MercadoLivreNotaBody[]> {
+): Promise<BuscarNotasResult> {
+
 
   const { clienteId, accessToken, refreshToken } = params
 
@@ -111,17 +117,18 @@ export async function buscarNotasMercadoLivre(
 
     console.log('[MERCADOLIVRE][RESUMO BUSCA]', {
       clienteId,
+      startDate,
+      endDate,
       totalXmlProcessados,
       totalXmlIgnorados,
       totalNotas: notas.length
     })
 
-    console.log('[MERCADOLIVRE][BUSCA] Retornando notas', {
-      clienteId,
-      totalNotas: notas.length
-    })
-
-    return notas
+    return {
+      notas,
+      startDate,
+      endDate
+    }
 
   } catch (error: any) {
     console.error('[MERCADOLIVRE][BUSCA][ERRO]', {
@@ -153,6 +160,10 @@ export async function buscarNotasMercadoLivre(
       clienteId
     })
 
-    return []
+    return {
+      notas: [],
+      startDate,
+      endDate
+    }
   }
 }
