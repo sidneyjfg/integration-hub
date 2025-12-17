@@ -1,6 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import SftpClient from 'ssh2-sftp-client'
+import { mercadolivreConfig } from '../env.schema'
 
 export default async function sendFilesViaSFTP(
   files: string[],
@@ -10,9 +11,9 @@ export default async function sendFilesViaSFTP(
   const sftp = new SftpClient()
 
   const config: any = {
-    host: process.env.SFTP_HOST,
-    port: Number(process.env.SFTP_PORT || 22),
-    username: process.env.SFTP_USER,
+    host: mercadolivreConfig.MERCADOLIVRE_SFTP_HOST,
+    port: Number(mercadolivreConfig.MERCADOLIVRE_SFTP_PORT || 22),
+    username: mercadolivreConfig.MERCADOLIVRE_SFTP_USER,
     readyTimeout: 30000
   }
 
@@ -25,7 +26,7 @@ export default async function sendFilesViaSFTP(
       config.passphrase = process.env.SFTP_PASSPHRASE
     }
   } else {
-    config.password = process.env.SFTP_PASSWORD
+    config.password = mercadolivreConfig.MERCADOLIVRE_SFTP_PASSWORD
   }
 
   const remoteRoot = remoteDir.replace(/\\/g, '/')

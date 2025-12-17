@@ -5,13 +5,6 @@ services:
     image: ghcr.io/sidneyjfg/integrations-hub:latest
     container_name: integrations-hub
     restart: unless-stopped
-
-    ports:
-      - "3000:3000"
-
-    env_file:
-      - .env
-
     environment:
       # =====================================================
       # 🌐 CONFIGURAÇÃO GLOBAL DO HUB
@@ -114,3 +107,5 @@ services:
       # =====================================================
       TRAY_URL: https://api.tray.com.br
       TRAY_TOKEN: ""
+    ports:
+      - "3000:3000"

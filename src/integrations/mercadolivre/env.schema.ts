@@ -24,6 +24,12 @@ export const mercadolivreEnvSchema = z.object({
     // 🏬 Lojas Nérus associadas (CSV)
     MERCADOLIVRE_STORENOS: z.string().min(1),
 
+    // SFTP Data
+    MERCADOLIVRE_SFTP_HOST: z.string().optional(),
+    MERCADOLIVRE_SFTP_PORT: z.string().optional(),
+    MERCADOLIVRE_SFTP_USER: z.string().optional(),
+    MERCADOLIVRE_SFTP_PASSWORD: z.string().optional(),
+
     // ⏱️ Período de busca
     MERCADOLIVRE_DAYS_TO_FETCH: z.coerce.number().min(1),
     MERCADOLIVRE_END_TO_FETCH: z.coerce.number().min(0).default(0),

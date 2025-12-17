@@ -5,14 +5,29 @@ import { poolMonitoramento } from './db'
 export async function runHubMigrations(hub: string) {
   const dir = path.resolve('db', hub)
 
-  try {
-    const files = await fs.readdir(dir)
+  let files: string[]
 
-    for (const file of files) {
-      const sql = await fs.readFile(path.join(dir, file), 'utf8')
-      await poolMonitoramento.query(sql)
-    }
+  try {
+    files = (await fs.readdir(dir)).sort()
   } catch {
-    // hub sem scripts → ignora
+    console.warn(`[MIGRATION] Nenhum script encontrado para hub ${hub}`)
+    return
+  }
+
+  for (const file of files) {
+    const fullPath = path.join(dir, file)
+
+    try {
+      const sql = await fs.readFile(fullPath, 'utf8')
+      await poolMonitoramento.query(sql)
+
+      console.log(`[MIGRATION] ${hub}/${file} aplicado`)
+    } catch (err) {
+      console.error(
+        `[MIGRATION ERROR] ${hub}/${file}`,
+        err
+      )
+      throw err // 👈 FAIL FAST (correto)
+    }
   }
 }
