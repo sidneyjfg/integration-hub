@@ -22,12 +22,24 @@ export async function runHubMigrations(hub: string) {
       await poolMonitoramento.query(sql)
 
       console.log(`[MIGRATION] ${hub}/${file} aplicado`)
-    } catch (err) {
+    } catch (err: any) {
+      // ✅ Ignora coluna já existente
+      if (
+        err?.code === 'ER_DUP_FIELDNAME' ||
+        err?.errno === 1060
+      ) {
+        console.warn(
+          `[MIGRATION] ${hub}/${file} ignorado (coluna já existe)`
+        )
+        continue
+      }
+
+      // ❌ Qualquer outro erro é crítico
       console.error(
         `[MIGRATION ERROR] ${hub}/${file}`,
         err
       )
-      throw err // 👈 FAIL FAST (correto)
+      throw err
     }
   }
 }
