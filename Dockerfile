@@ -6,6 +6,7 @@ COPY package*.json ./
 RUN npm install --production
 
 COPY dist ./dist
+COPY db ./db
 
 EXPOSE 3000
 
