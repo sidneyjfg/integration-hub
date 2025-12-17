@@ -1,5 +1,4 @@
 export interface MercadoLivreNotaBody {
-  filePath?: any | null;  
   status?: string
   venda_remessa?: string
   NFe?: string
@@ -16,4 +15,6 @@ export interface MercadoLivreNotaBody {
   observacao?: string
   data_nfe_ref?: string
   chave_nfe_ref?: string
+  filePath?: string
+  tipoNota: string
 }

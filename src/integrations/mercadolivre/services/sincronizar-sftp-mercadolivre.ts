@@ -1,12 +1,7 @@
 import path from 'path'
 
 import { buscarNotasMercadoLivre } from '../api/buscar-notas-mercadolivre'
-import {
-  filtrarPorIgnoreEndFile,
-  filtrarPorTipoNota,
-  getAllXmlFiles,
-  calculateDate
-} from '../utils'
+import { filtrarPorIgnoreEndFile, getAllXmlFiles } from '../utils'
 import { notifyGoogleChat } from '../notifications/google-chat'
 import { buildMercadoLivreSftpNotification } from '../notifications/build-sftp-notification'
 import { mercadolivreConfig } from '../env.schema'
@@ -24,9 +19,6 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
   const modo = resolverModoEnvio()
   console.log('[MERCADOLIVRE][SFTP] Modo selecionado:', modo)
 
-  // =====================================================
-  // 🔑 MULTI-CLIENTE
-  // =====================================================
   const clienteIds =
     mercadolivreConfig.MERCADOLIVRE_CLIENTE_ID.split(',').map(s => s.trim())
 
@@ -45,9 +37,6 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
     )
   }
 
-  // =====================================================
-  // 🔁 LOOP POR CLIENTE
-  // =====================================================
   for (let i = 0; i < clienteIds.length; i++) {
     const clienteId = clienteIds[i]
     const accessToken = accessTokens[i]
@@ -56,21 +45,33 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
     console.log('[MERCADOLIVRE][SFTP] Processando cliente', { clienteId })
 
     try {
-      const {
-        notas,
-        startDate,
-        endDate
-      } = await buscarNotasMercadoLivre({
-        clienteId,
-        accessToken,
-        refreshToken,
-        endOverride: mercadolivreConfig.MERCADOLIVRE_END_SFTP
-      })
+      const { notas, startDate, endDate } =
+        await buscarNotasMercadoLivre({
+          clienteId,
+          accessToken,
+          refreshToken,
+          endOverride: mercadolivreConfig.MERCADOLIVRE_END_SFTP
+        })
 
+      const ignoreTipos =
+        mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA
+          ?.split(',')
+          .map(s => s.trim()) ?? []
 
-      let files = notas.map(n => n.filePath).filter(Boolean)
+      const notasFiltradas = notas.filter(
+        n => !ignoreTipos.includes(n.tipoNota)
+      )
 
-      // 🔁 fallback legado
+      let files = notasFiltradas
+        .map(n => n.filePath)
+        .filter(Boolean) as string[]
+
+      files = filtrarPorIgnoreEndFile(
+        files,
+        mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE
+      )
+
+      // 🔁 fallback legado (somente se não veio nada do extract)
       if (!files.length) {
         const extractRoot = path.resolve('./notas/xml')
         files = await getAllXmlFiles(extractRoot)
@@ -81,29 +82,7 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         continue
       }
 
-      // =====================================================
-      // 🔥 FILTROS GLOBAIS
-      // =====================================================
-      files = filtrarPorIgnoreEndFile(
-        files,
-        mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE
-      )
-
-      files = await filtrarPorTipoNota(
-        files,
-        mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA
-      )
-
-      if (!files.length) {
-        console.log('[MERCADOLIVRE][SFTP] Nenhum XML após filtros', {
-          clienteId
-        })
-        continue
-      }
-
-      // =====================================================
-      // 🚚 EXECUÇÃO POR MODO
-      // =====================================================
+      // 🚚 ENVIO
       switch (modo) {
         case 'LOCAL_SIMPLES':
           await executarLocalSimples(files)
@@ -126,14 +105,13 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
           break
       }
 
+      // 📣 NOTIFICAÇÃO — SOMENTE O QUE FOI ENVIADO
       const notification = await buildMercadoLivreSftpNotification({
         clienteId,
         modo,
-        files,
+        notas: notasFiltradas,
         startDate,
         endDate,
-        ignoreTipo: mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA,
-        ignoreEnd: mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE,
         targetDir: mercadolivreConfig.MERCADOLIVRE_SFTP_DIR
       })
 
@@ -149,7 +127,6 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         `❌ Erro no SFTP Mercado Livre • Cliente ${clienteId}`
       )
 
-      // ⚠️ não interrompe os outros clientes
       continue
     }
   }

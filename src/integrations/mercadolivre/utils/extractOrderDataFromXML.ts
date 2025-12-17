@@ -9,6 +9,52 @@ function formatEmissao(emissaoISO?: string): string | null {
   return format(adjusted, 'dd/MM/yyyy HH:mm:ss')
 }
 
+function mapTipoNotaFromNatOp(natOp: string): string {
+  const n = natOp
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+  // 🔹 DEVOLUÇÃO
+  if (n.includes('devolucao') || n.includes('insucesso')) {
+    return 'devolucao'
+  }
+
+  // 🔹 RETORNO (depósito / simbólico)
+  if (
+    n.includes('retorno') ||
+    n.includes('deposito temporario')
+  ) {
+    return 'retorno'
+  }
+
+  // 🔹 REMESSA / TRANSFERÊNCIA
+  if (
+    n.includes('remessa') ||
+    n.includes('transferencia')
+  ) {
+    return 'remessa'
+  }
+
+  // 🔹 VENDA / FATURAMENTO
+  if (
+    n.includes('venda') ||
+    n.includes('comercializacao') ||
+    n.includes('comercialização') ||
+    n.includes('faturamento') ||
+      n.includes('saida')
+  ) {
+    return 'venda'
+  }
+
+  // 🔹 OUTRAS ENTRADAS
+  if (n.includes('entrada')) {
+    return 'entrada'
+  }
+
+  return n
+}
+
 function getNotaStatus(xml: any): { status: string; motivo: string } {
   const prot =
     xml?.nfeProc?.protNFe?.[0]?.infProt?.[0] ??
@@ -63,6 +109,15 @@ export default function extractOrderDataFromXML(
       : 'Desconhecido'
 
   const natOp = infNFe.ide?.[0]?.natOp?.[0] ?? ''
+  const tipoNota = mapTipoNotaFromNatOp(natOp)
+  if (tipoNota === 'outros') {
+    console.warn('[OUTROS]', {
+      file: fileName,
+      natOp,
+      status
+    })
+  }
+
   const natNorm = natOp.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
 
   const tipoLogistico = natNorm.includes(
@@ -85,7 +140,11 @@ export default function extractOrderDataFromXML(
       valor,
       valor_total: valorTotal,
       frete,
-      tipo_logistico: tipoLogistico
+      tipo_logistico: tipoLogistico,
+
+      // 🔑 NOVO
+      tipoNota,
+      filePath: fileName
     }
   ]
 }

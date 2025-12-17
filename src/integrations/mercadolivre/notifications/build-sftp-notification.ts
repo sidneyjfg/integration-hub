@@ -1,68 +1,37 @@
-import { countNotesByTipoNota } from '../utils/count-note-types'
-
 type BuildNotificationParams = {
   clienteId: string
   modo: string
-  files: string[]
+  notas: { tipoNota: string }[]
   startDate: string
   endDate: string
   targetDir?: string
-  ignoreEnd?: string
-  ignoreTipo?: string
 }
 
-type TipoCounter = Record<string, number>
-
 /**
- * 📣 Decide automaticamente QUAL notificação enviar
+ * 📣 Monta a notificação do SFTP Mercado Livre
+ * Baseada EXCLUSIVAMENTE nas notas realmente enviadas
  */
 export async function buildMercadoLivreSftpNotification(
   params: BuildNotificationParams
 ): Promise<string> {
-  const {
-    clienteId,
-    modo,
-    files,
-    startDate,
-    endDate,
-    targetDir,
-    ignoreEnd,
-    ignoreTipo
-  } = params
+  const { clienteId, modo, notas, startDate, endDate, targetDir } = params
 
-  // =====================================================
-  // 🧠 REGRA 1 — LEDGER → mensagem simples
-  // =====================================================
+  // 🧠 LEDGER → mensagem simples
   if (modo.includes('LEDGER')) {
     return (
       `📤 *Mercado Livre • SFTP Ledger*\n` +
       `Cliente: ${clienteId}\n` +
       `Período: ${startDate} → ${endDate}\n` +
-      `Novos arquivos enviados: ${files.length}\n` +
+      `Arquivos enviados: ${notas.length}\n` +
       (targetDir ? `Destino: ${targetDir}` : '')
     )
   }
 
-  // =====================================================
-  // 🧠 REGRA 2 — NÃO HÁ FILTROS → mensagem simples
-  // =====================================================
-  const hasIgnoreTipo = Boolean(ignoreTipo?.trim())
-  const hasIgnoreEnd = Boolean(ignoreEnd?.trim())
-
-  if (!hasIgnoreTipo && !hasIgnoreEnd) {
-    return (
-      `📤 *Mercado Livre • SFTP*\n` +
-      `Cliente: ${clienteId}\n` +
-      `Período: ${startDate} → ${endDate}\n` +
-      `Arquivos enviados: ${files.length}\n` +
-      (targetDir ? `Destino: ${targetDir}` : '')
-    )
-  }
-
-  // =====================================================
-  // 🧠 REGRA 3 — HÁ FILTRO → AGRUPA POR TIPO DE NOTA
-  // =====================================================
-  const counters = await countNotesByTipoNota(files)
+  // 🧠 AGRUPAMENTO POR TIPO DE NOTA
+  const counters = notas.reduce<Record<string, number>>((acc, n) => {
+    acc[n.tipoNota] = (acc[n.tipoNota] || 0) + 1
+    return acc
+  }, {})
 
   const detalhes = Object.entries(counters)
     .map(([tipo, total]) => `📂 ${total} arquivo(s) de ${tipo}`)
