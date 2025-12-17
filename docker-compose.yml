@@ -104,7 +104,7 @@ services:
       PLUGGTO_CLIENT_SECRET: ""
       PLUGGTO_USERNAME: ""
       PLUGGTO_PASSWORD: ""
-      DAYS_TO_FETCH: "1"
+      PLUGGTO_DAYS_TO_FETCH: "1"
       STORENO: "1"
       NERUS_RECEIVE_ORDER_URL: https://nerus.com.br/api/receive-order
 

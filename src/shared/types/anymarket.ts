@@ -5,6 +5,10 @@ export interface AnymarketOrderBody {
   status?: string
   fulfillment?: boolean
   createdAt?: string
+  // novos campos
+  gross?: number          // Total bruto sem frete
+  discount?: number       // Valor de desconto
+  total?: number          // Total final
 }
 
 

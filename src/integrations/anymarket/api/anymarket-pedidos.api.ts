@@ -56,7 +56,12 @@ export async function buscarPedidosRecentesAnymarket(): Promise<AnymarketOrderBo
         marketPlace: order.marketPlace,
         status: order.status,
         fulfillment: order.fulfillment,
-        createdAt: order.createdAt
+        createdAt: order.createdAt,
+
+        // novos campos vindos da AnyMarket
+        gross: order.gross,
+        discount: order.discount,
+        total: order.total
       }))
 
       const filtered = fetchedOrders.filter(o => {

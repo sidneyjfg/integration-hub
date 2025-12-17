@@ -19,16 +19,30 @@ export async function salvarPedidosAnymarketMonitoramento(
   }
 
   const sql = `
-    INSERT INTO temp_orders
-      (order_id, marketplace_id, marketplace, status, fulfillment, created_at)
-    VALUES (?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-      marketplace_id = VALUES(marketplace_id),
-      marketplace     = VALUES(marketplace),
-      status          = VALUES(status),
-      fulfillment     = VALUES(fulfillment),
-      created_at      = VALUES(created_at)
-  `
+  INSERT INTO temp_orders
+    (
+      order_id,
+      marketplace_id,
+      marketplace,
+      status,
+      fulfillment,
+      created_at,
+      gross,
+      discount,
+      total
+    )
+  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ON DUPLICATE KEY UPDATE
+    marketplace_id = VALUES(marketplace_id),
+    marketplace    = VALUES(marketplace),
+    status         = VALUES(status),
+    fulfillment    = VALUES(fulfillment),
+    created_at     = VALUES(created_at),
+    gross          = VALUES(gross),
+    discount       = VALUES(discount),
+    total          = VALUES(total)
+`
+
 
   try {
     for (const pedido of pedidos) {
@@ -38,12 +52,15 @@ export async function salvarPedidosAnymarketMonitoramento(
       console.log('[ANYMARKET][DEBUG] Pedido recebido:', pedido);
 
       await poolMonitoramento.execute(sql, [
-        pedido.id,
-        pedido.marketplaceId,
-        pedido.marketPlace,
-        pedido.status,
-        pedido.fulfillment,
-        formatDateForMysql(createdAt)
+        pedido.id ?? null,
+        pedido.marketplaceId ?? null,
+        pedido.marketPlace ?? null,
+        pedido.status ?? null,
+        pedido.fulfillment ?? null,
+        formatDateForMysql(createdAt),
+        pedido.gross ?? null,
+        pedido.discount ?? null,
+        pedido.total ?? null
       ])
     }
 
