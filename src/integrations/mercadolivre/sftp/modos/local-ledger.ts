@@ -7,10 +7,11 @@ import {
 } from '../../utils'
 
 import { ledgerSimples } from '../ledger-simples'
+import { ResultadoEnvio } from '../../../../shared/types'
 
 export async function executarLocalLedger(
   files: string[]
-): Promise<number> {
+): Promise<ResultadoEnvio> {
 
   const {
     MERCADOLIVRE_SFTP_DIR,
@@ -34,7 +35,7 @@ export async function executarLocalLedger(
 
   if (!novos.length) {
     console.log('[LOCAL][LEDGER] Nenhum arquivo novo para mover')
-    return 0
+    return { arquivos: [], total: 0 }
   }
 
   await moveFilesLocal(novos, MERCADOLIVRE_SFTP_DIR)
@@ -43,5 +44,8 @@ export async function executarLocalLedger(
 
   console.log('[LOCAL][LEDGER] Arquivos movidos', { total: novos.length })
 
-  return novos.length
+  return {
+    arquivos: novos.map(f => path.basename(f)),
+    total: novos.length
+  }
 }

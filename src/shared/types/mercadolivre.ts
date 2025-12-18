@@ -18,3 +18,8 @@ export interface MercadoLivreNotaBody {
   filePath?: string
   tipoNota: string
 }
+
+export type ResultadoEnvio = {
+  arquivos: string[]
+  total: number
+}

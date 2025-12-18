@@ -6,14 +6,18 @@ import {
   filtrarPorTipoNota
 } from '../../utils'
 
+import { ledgerSimples } from '../ledger-simples'
+import { ResultadoEnvio } from '../../../../shared/types'
+
 /**
- * 🔵 Fluxo SFTP VONDER (fixo)
- * - Bucket IN / IN_EVENTOS / CTE
- * - Sem ledger
+ * 🔵 Fluxo SFTP VONDER
+ * - Usa ledgerSimples (local e persistente)
+ * - Classifica arquivos em IN / IN_EVENTOS / CTE
+ * - NÃO confia no SFTP (arquivos são consumidos)
  */
 export async function executarSftpVonder(
   files: string[]
-): Promise<number> {
+): Promise<ResultadoEnvio> {
 
   const {
     MERCADOLIVRE_SFTP_DIR,
@@ -34,13 +38,20 @@ export async function executarSftpVonder(
     MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA
   )
 
-  if (!filtrados.length) {
-    console.log('[VONDER][SFTP] Nenhum arquivo após filtros')
-    return 0
+  // -----------------------------
+  // 2️⃣ Ledger (ANTES de enviar)
+  // -----------------------------
+  const novos = filtrados.filter(
+    f => !ledgerSimples.jaEnviado(path.basename(f))
+  )
+
+  if (!novos.length) {
+    console.log('[VONDER][SFTP] Nenhum arquivo novo após ledger')
+    return { arquivos: [], total: 0 }
   }
 
   // -----------------------------
-  // 2️⃣ Classificação VONDER
+  // 3️⃣ Classificação VONDER
   // -----------------------------
   const isEventoNFe = (file: string) => {
     const n = file.toLowerCase()
@@ -56,40 +67,52 @@ export async function executarSftpVonder(
     return n.includes('cte') || n.includes('ct-e') || n.includes('proccte')
   }
 
-  const paraIN = filtrados.filter(
+  const paraIN = novos.filter(
     f => !isEventoNFe(f) && !isCTe(f)
   )
 
-  const paraEVENTOS = filtrados.filter(isEventoNFe)
-  const paraCTE = filtrados.filter(isCTe)
+  const paraEVENTOS = novos.filter(isEventoNFe)
+  const paraCTE = novos.filter(isCTe)
 
   // -----------------------------
-  // 3️⃣ Envio por bucket
+  // 4️⃣ Envio por bucket
   // -----------------------------
   const join = (dir: string) =>
     path.posix.join(MERCADOLIVRE_SFTP_DIR!, dir)
 
+  let enviados = 0
+
   if (paraIN.length) {
     await sendFilesViaSFTP(paraIN, join('IN'))
+    enviados += paraIN.length
   }
 
   if (paraEVENTOS.length) {
     await sendFilesViaSFTP(paraEVENTOS, join('IN_EVENTOS'))
+    enviados += paraEVENTOS.length
   }
 
   if (paraCTE.length) {
     await sendFilesViaSFTP(paraCTE, join('CTE'))
+    enviados += paraCTE.length
   }
 
-  const totalEnviado =
-    paraIN.length + paraEVENTOS.length + paraCTE.length
+  // -----------------------------
+  // 5️⃣ Registrar no ledger (APÓS sucesso)
+  // -----------------------------
+  ledgerSimples.registrar(
+    novos.map(f => path.basename(f))
+  )
 
   console.log('[VONDER][SFTP] Envio concluído', {
     IN: paraIN.length,
     EVENTOS: paraEVENTOS.length,
     CTE: paraCTE.length,
-    TOTAL: totalEnviado
+    TOTAL: enviados
   })
 
-  return totalEnviado
+  return {
+    arquivos: novos.map(f => path.basename(f)),
+    total: enviados
+  }
 }

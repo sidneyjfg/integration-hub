@@ -45,7 +45,7 @@ export async function buscarNotasMercadoLivre(
 
   const startDate = calculateDate(MERCADOLIVRE_DAYS_TO_FETCH)
   const endDate = calculateDate(
-    params.endOverride ?? mercadolivreConfig.MERCADOLIVRE_END_TO_FETCH
+    params.endOverride ?? MERCADOLIVRE_END_TO_FETCH
   )
 
   const url =

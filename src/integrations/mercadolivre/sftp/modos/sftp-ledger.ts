@@ -4,10 +4,11 @@ import { sendFilesViaSFTP } from '../../utils'
 import { filtrarPorIgnoreEndFile, filtrarPorTipoNota, moveFilesLocal } from '../../utils'
 
 import { ledgerSimples } from '../ledger-simples'
+import { ResultadoEnvio } from '../../../../shared/types'
 
 export async function executarSftpLedger(
   files: string[]
-): Promise<number> {
+): Promise<ResultadoEnvio> {
 
   const {
     MERCADOLIVRE_SFTP_DIR,
@@ -29,12 +30,15 @@ export async function executarSftpLedger(
     f => !ledgerSimples.jaEnviado(path.basename(f))
   )
 
-  if (!novos.length) return 0
+  if (!novos.length) return { arquivos: [], total: 0 }
 
   await sendFilesViaSFTP(novos, MERCADOLIVRE_SFTP_DIR)
 
   ledgerSimples.registrar(novos.map(f => path.basename(f)))
 
-  return novos.length
+  return {
+    arquivos: novos.map(f => path.basename(f)),
+    total: novos.length
+  }
 }
 

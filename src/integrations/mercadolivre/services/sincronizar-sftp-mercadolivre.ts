@@ -12,6 +12,7 @@ import { executarLocalLedger } from '../sftp/modos/local-ledger'
 import { executarSftpSimples } from '../sftp/modos/sftp-simples'
 import { executarSftpLedger } from '../sftp/modos/sftp-ledger'
 import { executarSftpVonder } from '../sftp/modos/sftp-vonder'
+import { ResultadoEnvio } from '../../../shared/types'
 
 export async function sincronizarSFTPMercadoLivre(): Promise<void> {
   console.log('[MERCADOLIVRE][SFTP] Iniciando sincronização SFTP')
@@ -83,6 +84,7 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
       }
 
       let enviados = 0
+      let resultadoEnvio: ResultadoEnvio = { arquivos: [], total: 0 }
 
       switch (modo) {
         case 'LOCAL_SIMPLES':
@@ -90,7 +92,7 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
           break
 
         case 'LOCAL_LEDGER':
-          enviados = await executarLocalLedger(files)
+          resultadoEnvio = await executarLocalLedger(files)
           break
 
         case 'SFTP_SIMPLES':
@@ -98,19 +100,27 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
           break
 
         case 'SFTP_LEDGER':
-          enviados = await executarSftpLedger(files)
+          resultadoEnvio = await executarSftpLedger(files)
           break
 
         case 'SFTP_VONDER':
-          enviados = await executarSftpVonder(files)
+          resultadoEnvio = await executarSftpVonder(files)
           break
       }
+
+      const usarEnviados = modo.includes('_LEDGER')
+
+      const notasParaNotificar = usarEnviados
+        ? notasFiltradas.filter(n =>
+          resultadoEnvio.arquivos.includes(path.basename(n.filePath!))
+        )
+        : notasFiltradas
 
       // 📣 NOTIFICAÇÃO — SOMENTE O QUE FOI ENVIADO
       const notification = await buildMercadoLivreSftpNotification({
         clienteId,
         modo,
-        notas: notasFiltradas,
+        notas: notasParaNotificar,
         startDate,
         endDate,
         targetDir: mercadolivreConfig.MERCADOLIVRE_SFTP_DIR
