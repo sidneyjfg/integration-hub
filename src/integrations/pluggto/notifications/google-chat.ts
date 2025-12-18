@@ -2,7 +2,7 @@ import axios from 'axios';
 import { coreConfig } from '../../../core/env.schema';
 
 // Função para enviar a notificação via Google Chat Webhook
-export async function sendNotification(message: string | object): Promise<void> {
+export async function notifyGoogleChat(message: string | object): Promise<void> {
   try {
     const webhookUrl = coreConfig.GOOGLE_CHAT_WEBHOOK_URL;
 

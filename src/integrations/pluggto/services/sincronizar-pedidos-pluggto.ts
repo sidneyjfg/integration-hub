@@ -1,11 +1,11 @@
 import { buscarPedidosPluggto } from '../api/buscar-pedidos-pluggto'
 import { reenviarPedidoPluggto } from './reenviar-pedidos-pluggto'
-import { notifyGoogleChat } from '../../anymarket/notifications/google-chat'
 import {
     buscarPedidosNaoIntegrados,
     salvarPedidosTempPluggto
 } from '../repositories/pedidos.repository'
 import { pluggtoConfig } from '../env.schema'
+import { notifyGoogleChat } from '../notifications/google-chat'
 
 export async function sincronizarPedidosPluggto() {
     console.log('[PLUGGTO][SYNC] Iniciando pedidos')
