@@ -1,7 +1,6 @@
 import { mercadolivreConfig } from '../../env.schema'
-import { sendFilesViaSFTP } from '../../utils'
 import { filtrarPorIgnoreEndFile, filtrarPorTipoNota } from '../../utils'
-
+import { sendFilesViaSFTP } from '../../utils/send-files-sftp'
 
 export async function executarSftpSimples(
   files: string[]
@@ -25,5 +24,5 @@ export async function executarSftpSimples(
 
   if (!filtrados.length) return
 
-  await sendFilesViaSFTP(filtrados, MERCADOLIVRE_SFTP_DIR)
+  await sendFilesViaSFTP(filtrados, MERCADOLIVRE_SFTP_DIR!)
 }

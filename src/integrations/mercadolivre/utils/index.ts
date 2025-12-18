@@ -6,7 +6,7 @@ import extractChaveFromId from './extractChaveFromId'
 import isSerieIgnorada from './ignoreSeries'
 import getAllXmlFiles from './getAllXmlFiles'
 import moveFilesLocal from './move-files-local'
-import sendFilesViaSFTP from './send-files-sftp'
+import sendFilesViaSFTP from './send-file-sftp'
 import filtrarPorIgnoreEndFile from './filter-ignore-end-file'
 import filtrarPorTipoNota from './filter-ignore-tipo-nota'
 

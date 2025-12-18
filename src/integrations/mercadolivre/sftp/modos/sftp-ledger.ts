@@ -1,10 +1,9 @@
 import path from 'path'
 import { mercadolivreConfig } from '../../env.schema'
-import { sendFilesViaSFTP } from '../../utils'
-import { filtrarPorIgnoreEndFile, filtrarPorTipoNota, moveFilesLocal } from '../../utils'
-
+import { filtrarPorIgnoreEndFile, filtrarPorTipoNota } from '../../utils'
 import { ledgerSimples } from '../ledger-simples'
 import { ResultadoEnvio } from '../../../../shared/types'
+import { sendFilesViaSFTP } from '../../utils/send-files-sftp'
 
 export async function executarSftpLedger(
   files: string[]
@@ -30,9 +29,11 @@ export async function executarSftpLedger(
     f => !ledgerSimples.jaEnviado(path.basename(f))
   )
 
-  if (!novos.length) return { arquivos: [], total: 0 }
+  if (!novos.length) {
+    return { arquivos: [], total: 0 }
+  }
 
-  await sendFilesViaSFTP(novos, MERCADOLIVRE_SFTP_DIR)
+  await sendFilesViaSFTP(novos, MERCADOLIVRE_SFTP_DIR!)
 
   ledgerSimples.registrar(novos.map(f => path.basename(f)))
 
@@ -41,4 +42,3 @@ export async function executarSftpLedger(
     total: novos.length
   }
 }
-

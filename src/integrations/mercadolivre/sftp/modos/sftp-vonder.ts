@@ -2,12 +2,11 @@ import path from 'path'
 import { mercadolivreConfig } from '../../env.schema'
 import {
   filtrarPorIgnoreEndFile,
-  filtrarPorTipoNota,
-  sendFilesViaSFTP
+  filtrarPorTipoNota
 } from '../../utils'
+import sendFileViaSFTP from '../../utils/send-file-sftp'
 import { ledgerSimples } from '../ledger-simples'
 import { ResultadoEnvio } from '../../../../shared/types'
-
 
 function resolverDiretorioVonder(file: string): string {
   const lower = file.toLowerCase()
@@ -45,9 +44,8 @@ async function enviarArquivoVonder(
   const dir = resolverDiretorioVonder(file)
   const destino = path.posix.join(targetRoot, dir)
 
-  await sendFilesViaSFTP(file, destino)
+  await sendFileViaSFTP(file, destino)
 
-  // ✅ Ledger somente após sucesso real
   ledgerSimples.registrar([nome])
 
   return nome
@@ -84,14 +82,13 @@ export async function executarSftpVonder(
 
       if (enviado) {
         enviados.push(enviado)
-        await new Promise(r => setTimeout(r, 500)) // throttle seguro
+        await new Promise(r => setTimeout(r, 500))
       }
     } catch (err) {
       console.error('[VONDER][SFTP] Falha ao enviar arquivo', {
         file,
         err
       })
-      // ⚠️ Não registra ledger, permitindo retry
     }
   }
 
@@ -100,4 +97,3 @@ export async function executarSftpVonder(
     total: enviados.length
   }
 }
-
