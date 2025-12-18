@@ -67,7 +67,9 @@ export async function executarSftpVonder(
     if (isEventoNFe(file)) dir = 'IN_EVENTOS'
     else if (isCTe(file)) dir = 'CTE'
 
-    await sendFilesViaSFTP([file], join(dir))
+    await sendFilesViaSFTP(file, join(dir))
+    ledgerSimples.registrar([nome])
+    enviados.push(nome)
     ledgerSimples.registrar([nome])
     enviados.push(nome)
 
