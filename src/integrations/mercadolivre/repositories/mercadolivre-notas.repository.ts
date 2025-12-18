@@ -235,6 +235,51 @@ export async function buscarLogNotaNaoIntegrada(
 }
 
 /**
+ * 🔍 Busca notas específicas que ainda NÃO foram integradas no Nérus
+ * (filtrando por lista de chaves — uso por cliente)
+ */
+export async function buscarNotasNaoIntegradasNerusPorChaves(
+  chaves: string[]
+): Promise<any[]> {
+
+  if (!chaves.length) return []
+
+  const placeholders = chaves.map(() => '?').join(', ')
+
+  const sql = `
+    SELECT
+      t.chave                 AS CHAVE_NFE,
+      t.NFe                   AS NFE,
+      t.serie                 AS SERIE,
+      t.emissao               AS EMISSAO,
+      t.valor_total           AS VALOR_TOTAL,
+      t.tipo_logistico        AS TIPO_LOGISTICO,
+      t.status                AS STATUS,
+      t.modalidade            AS MODALIDADE
+    FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas t
+    WHERE t.chave IN (${placeholders})
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ${coreConfig.DB_NAME_DADOS}.nfeavxml n
+        WHERE n.nfkey = t.chave
+          AND n.storeno IN (${coreConfig.STORENOS
+            .split(',')
+            .map(id => `'${id.trim()}'`)
+            .join(', ')})
+      )
+    ORDER BY t.emissao DESC
+  `
+
+  const [rows] = await poolMonitoramento.query(sql, chaves)
+
+  console.log('[MERCADOLIVRE][DB] Notas não integradas (por chaves)', {
+    total: (rows as any[]).length
+  })
+
+  return rows as any[]
+}
+
+/**
  * 🔁 Lê o retryCount atual da ffpreprocnf
  */
 export async function getRetryCountFfpreprocnf(params: {

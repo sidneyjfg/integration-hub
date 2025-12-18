@@ -1,6 +1,7 @@
 import {
   salvarNotasTmpMercadoLivre,
   buscarNotasNaoIntegradasNerus,
+  buscarNotasNaoIntegradasNerusPorChaves,
   verificarECriarTabelaTmpNotas
 } from '../repositories/mercadolivre-notas.repository'
 import { notifyGoogleChat } from '../notifications/google-chat'
@@ -50,6 +51,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
             accessToken,
             refreshToken
           })
+        const chavesCliente = notas.map(n => n.chave)
 
         console.log('[MERCADOLIVRE][SYNC][BUSCA FINALIZADA]', {
           clienteId,
@@ -80,7 +82,8 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
 
         console.log('[MERCADOLIVRE][SYNC][DB] Buscando notas não integradas')
         const notasNaoIntegradas =
-          await buscarNotasNaoIntegradasNerus()
+          await buscarNotasNaoIntegradasNerusPorChaves(chavesCliente)
+
 
         console.log('[MERCADOLIVRE][SYNC][DB] Resultado comparação', {
           clienteId,

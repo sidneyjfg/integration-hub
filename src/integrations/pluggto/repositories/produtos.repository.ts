@@ -1,10 +1,11 @@
 // repositories/produtos.repository.ts
 import { poolMonitoramento } from '../../../core/db'
+import { coreConfig } from '../../../core/env.schema'
 import { PluggtoProductBody } from '../../../shared/types'
 
 export async function salvarProdutosTempPluggto(produtos: PluggtoProductBody[]) {
   const sql = `
-    INSERT INTO temp_products (idNerus, idPluggto, ean, name, price, pricePromotion, stock)
+    INSERT INTO ${coreConfig.DB_NAME_MONITORAMENTO}.temp_products (idNerus, idPluggto, ean, name, price, pricePromotion, stock)
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `
 
