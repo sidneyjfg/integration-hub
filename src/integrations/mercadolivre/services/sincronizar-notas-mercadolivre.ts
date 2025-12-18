@@ -1,13 +1,13 @@
 import {
   salvarNotasTmpMercadoLivre,
-  buscarNotasNaoIntegradasNerus,
+  // buscarNotasNaoIntegradasNerus,
   buscarNotasNaoIntegradasNerusPorChaves,
   verificarECriarTabelaTmpNotas
 } from '../repositories/mercadolivre-notas.repository'
 import { notifyGoogleChat } from '../notifications/google-chat'
-import { MercadoLivreNotaBody } from '../../../shared/types/mercadolivre'
 import { buscarNotasMercadoLivre } from '../api/buscar-notas-mercadolivre'
 import { mercadolivreConfig } from '../env.schema'
+import { buildNotaNaoIntegradaCard } from '../notifications/build-notas-notification'
 
 export async function sincronizarNotasMercadoLivre(): Promise<void> {
   console.log('[MERCADOLIVRE][SYNC] Iniciando sincronização de notas')
@@ -91,10 +91,20 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
         })
 
         if (notasNaoIntegradas.length > 0) {
+
+          // 🔔 resumo
           await notifyGoogleChat(
             `⚠️ ${notasNaoIntegradas.length} notas do Mercado Livre não integradas no Nérus (Conta ${clienteId}).`
           )
-        } else {
+
+          // 📋 cards por nota
+          const cards = notasNaoIntegradas.map(nota =>
+            buildNotaNaoIntegradaCard(nota, clienteId)
+          )
+
+          await notifyGoogleChat({ cards })
+        }
+        else {
           await notifyGoogleChat(
             `✅ Todas as notas do Mercado Livre foram integradas no Nérus (Conta ${clienteId}).`
           )

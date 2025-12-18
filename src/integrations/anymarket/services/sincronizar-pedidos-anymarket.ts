@@ -42,7 +42,7 @@ export const sincronizarPedidosAnymarket = async (): Promise<void> => {
 
     if (pedidosNaoIntegrados.length > 0) {
       const listaNaoIntegrados = pedidosNaoIntegrados.map(p =>
-        `|${p.ID_ANYMARKET} \n| ${p.MARKETPLACE} \n| ${p.STATUS_ANY} \n|Fulfillment: ${p.FULFILLMENT}`
+        `| ${p.ID_ANYMARKET} \n| ${p.DATA} \n| ${p.MARKETPLACE} \n| ${p.STATUS_ANY} \n| Fulfillment: ${p.FULFILLMENT}`
       )
 
       const mensagensReenvio =

@@ -183,37 +183,37 @@ export async function verificarECriarTabelaTmpNotas(): Promise<void> {
  * 🔍 Busca notas do Mercado Livre que ainda NÃO foram integradas no Nérus
  * (comparação tmp_notas x nfeavxml)
  */
-export async function buscarNotasNaoIntegradasNerus(): Promise<any[]> {
-  const sql = `
-    SELECT
-      t.chave                 AS CHAVE_NFE,
-      t.NFe                   AS NFE,
-      t.serie                 AS SERIE,
-      t.emissao               AS EMISSAO,
-      t.valor_total           AS VALOR_TOTAL,
-      t.tipo_logistico        AS TIPO_LOGISTICO,
-      t.status                AS STATUS,
-      t.modalidade            AS MODALIDADE
-    FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas t
-    WHERE NOT EXISTS (
-      SELECT 1
-        FROM ${coreConfig.DB_NAME_DADOS}.nfeavxml n
-       WHERE n.nfkey = t.chave and n.storeno in(${coreConfig.STORENOS.split(',').map(id => `'${id.trim()}'`).join(', ')})
-    ) 
-    ORDER BY t.emissao DESC
-  `
+// export async function buscarNotasNaoIntegradasNerus(): Promise<any[]> {
+//   const sql = `
+//     SELECT
+//       t.chave                 AS CHAVE_NFE,
+//       t.NFe                   AS NFE,
+//       t.serie                 AS SERIE,
+//       t.emissao               AS EMISSAO,
+//       t.valor_total           AS VALOR_TOTAL,
+//       t.tipo_logistico        AS TIPO_LOGISTICO,
+//       t.status                AS STATUS,
+//       t.modalidade            AS MODALIDADE
+//     FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas t
+//     WHERE NOT EXISTS (
+//       SELECT 1
+//         FROM ${coreConfig.DB_NAME_DADOS}.nfeavxml n
+//        WHERE n.nfkey = t.chave and n.storeno in(${coreConfig.STORENOS.split(',').map(id => `'${id.trim()}'`).join(', ')})
+//     ) 
+//     ORDER BY t.emissao DESC
+//   `
 
-  const [rows] = await poolMonitoramento.query(sql)
+//   const [rows] = await poolMonitoramento.query(sql)
 
-  const resultado = rows as any[]
+//   const resultado = rows as any[]
 
-  console.log(
-    '[MERCADOLIVRE][DB] Notas não integradas encontradas',
-    { total: resultado.length }
-  )
+//   console.log(
+//     '[MERCADOLIVRE][DB] Notas não integradas encontradas',
+//     { total: resultado.length }
+//   )
 
-  return resultado
-}
+//   return resultado
+// }
 
 
 /**
