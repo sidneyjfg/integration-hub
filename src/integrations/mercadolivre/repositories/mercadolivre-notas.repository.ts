@@ -198,8 +198,8 @@ export async function buscarNotasNaoIntegradasNerus(): Promise<any[]> {
     WHERE NOT EXISTS (
       SELECT 1
         FROM ${coreConfig.DB_NAME_DADOS}.nfeavxml n
-       WHERE n.nfkey = t.chave
-    ) and n.storeno in(${coreConfig.STORENOS.split(',').map(id => `'${id.trim()}'`).join(', ')})
+       WHERE n.nfkey = t.chave and n.storeno in(${coreConfig.STORENOS.split(',').map(id => `'${id.trim()}'`).join(', ')})
+    ) 
     ORDER BY t.emissao DESC
   `
 
