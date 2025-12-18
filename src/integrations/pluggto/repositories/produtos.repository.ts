@@ -1,20 +1,22 @@
 // repositories/produtos.repository.ts
 import { poolMonitoramento } from '../../../core/db'
+import { PluggtoProductBody } from '../../../shared/types'
 
-export async function salvarProdutosTempPluggto(produtos: any[]) {
+export async function salvarProdutosTempPluggto(produtos: PluggtoProductBody[]) {
   const sql = `
-    INSERT INTO temp_products (idPluggto, sku, ean, name, price, stock)
-    VALUES (?, ?, ?, ?, ?, ?)
+    INSERT INTO temp_products (idNerus, idPluggto, ean, name, price, pricePromotion, stock)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   `
 
   for (const p of produtos) {
     await poolMonitoramento.execute(sql, [
-      p.Product.id,
-      p.Product.sku,
-      p.Product.ean,
-      p.Product.name,
-      p.Product.price,
-      p.Product.quantity,
+      p.idNerus,
+      p.idPluggto,
+      p.ean,
+      p.name,
+      p.price,
+      p.pricePromotion,
+      p.stock,
     ])
   }
 }
