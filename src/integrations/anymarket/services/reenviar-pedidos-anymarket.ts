@@ -16,18 +16,6 @@ export const reenviarPedidosAnymarketNaoIntegradosNerus = async (
     )
 
     const linhas: string[] = []
-
-    linhas.push(`📦 Pedidos não integrados encontrados: ${pedidos.length}`)
-    linhas.push('') // linha em branco
-
-    for (const p of pedidos) {
-      // mostra apenas os pedidos não integrados
-      linhas.push(
-        `${p.DATA ?? ''}\n ID_ANYMARKET: ${p.ID_ANYMARKET} \nPEDIDO: ${p.PEDIDO} \nMARKETPLACE: ${p.MARKETPLACE}`
-      )
-    }
-
-    linhas.push('') // linha em branco
     linhas.push(
       '⚠️ Reenvio não executado: variável NERUS_NOTIFICATION_URL não definida.'
     )

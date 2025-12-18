@@ -86,19 +86,20 @@ export async function buscarPedidosRecentesAnymarket(): Promise<AnymarketOrderBo
           o.status,
           anymarketConfig.NO_LOOK_STATUS_TYPE
         )
-        if (filtered.length > 0) {
-          console.log(
-            '[ANYMARKET][BUSCA][DEPOIS FILTRO]',
-            filtered.map(o => ({
-              id: o.id,
-              status: o.status,
-              fulfillment: isFullByAnymarketField(o.fulfillment)
-            }))
-          )
-        }
 
         return matchesFulfillment && !ignored
       })
+
+      if (filtered.length > 0) {
+        console.log(
+          '[ANYMARKET][BUSCA][DEPOIS FILTRO]',
+          filtered.map(o => ({
+            id: o.id,
+            status: o.status,
+            fulfillment: isFullByAnymarketField(o.fulfillment)
+          }))
+        )
+      }
 
       console.log(
         `[ANYMARKET][BUSCA] Página processada`,

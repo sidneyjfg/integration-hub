@@ -8,7 +8,7 @@ export const formatDateWithFixedTimezone = (daysAgo: number): string => {
 
     return `${year}-${month}-${day}T00:00:00-03:00`;
 };
- export const formatDateForMysql = (date: Date): string => {
+export const formatDateForMysql = (date: Date): string => {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
@@ -16,7 +16,7 @@ export const formatDateWithFixedTimezone = (daysAgo: number): string => {
     const minutes = date.getMinutes().toString().padStart(2, '0');
     const seconds = date.getSeconds().toString().padStart(2, '0');
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-  };
+};
 
 export const isFullByAnymarketField = (val: unknown): boolean => {
     if (typeof val === 'boolean') return val;
@@ -37,10 +37,14 @@ export const matchesMode = (fulfillmentValue: unknown, takeFull: boolean, takeCo
     return false;                               // nenhum habilitado
 };
 
-export const isIgnoredStatus = (status: string, ignoreList: string): boolean => {
-    if (!ignoreList) return false;
+export const isIgnoredStatus = (
+    status: unknown,
+    ignoreList: string[]
+): boolean => {
+    if (!ignoreList.length) return false
+    if (typeof status !== 'string') return false
 
-    const list = ignoreList.split(',').map(s => s.trim().toUpperCase());
-    return list.includes(status.toUpperCase());
-};
+    return ignoreList.includes(status.trim().toUpperCase())
+}
+
 

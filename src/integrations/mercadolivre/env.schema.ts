@@ -21,9 +21,6 @@ export const mercadolivreEnvSchema = z.object({
     // 🧾 Conta Mercado Livre
     MERCADOLIVRE_CLIENTE_ID: z.string().min(1),
 
-    // 🏬 Lojas Nérus associadas (CSV)
-    MERCADOLIVRE_STORENOS: z.string().min(1),
-
     // SFTP Data
     MERCADOLIVRE_SFTP_HOST: z.string().optional(),
     MERCADOLIVRE_SFTP_PORT: z.string().optional(),

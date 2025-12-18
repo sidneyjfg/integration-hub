@@ -18,8 +18,15 @@ export const anymarketEnvSchema = z.object({
   FULFILLMENT: z.preprocess(toBool, z.boolean()).default(false),
   CONVENCIONAL: z.preprocess(toBool, z.boolean()).default(false),
 
-  NO_LOOK_STATUS_TYPE: z.string().default(''),
-
+  NO_LOOK_STATUS_TYPE: z
+    .string()
+    .default('')
+    .transform(v =>
+      v
+        .split(',')
+        .map((s: string) => s.trim().toUpperCase())
+        .filter(Boolean)
+    ),
   // Nérus (opcionais)
   NERUS_NOTIFICATION_URL: z.string().url().optional().or(z.literal('')),
   NERUS_RECEIVE_NOTIFICATION_URL: z.string().url().optional().or(z.literal('')),

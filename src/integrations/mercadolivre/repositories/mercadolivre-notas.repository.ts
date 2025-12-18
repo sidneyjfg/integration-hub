@@ -10,7 +10,7 @@ import { isSerieIgnorada } from '../utils'
 export async function checkNotaExistente(
   chaveNfe: string
 ): Promise<boolean> {
-  const storenos = mercadolivreConfig.MERCADOLIVRE_STORENOS
+  const storenos = coreConfig.STORENOS
     .split(',')
     .map(s => `'${s.trim()}'`)
     .join(',')

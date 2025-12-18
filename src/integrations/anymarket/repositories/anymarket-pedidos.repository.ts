@@ -79,6 +79,21 @@ export async function salvarPedidosAnymarketMonitoramento(
  */
 export async function buscarPedidosAnymarketNaoIntegradosNerus():
   Promise<ResultadoComparacaoPedido[]> {
+  const whereFulfillment =
+    anymarketConfig.FULFILLMENT && !anymarketConfig.CONVENCIONAL
+      ? 'AND t.fulfillment = 1'
+      : anymarketConfig.CONVENCIONAL && !anymarketConfig.FULFILLMENT
+        ? 'AND (t.fulfillment = 0 OR t.fulfillment IS NULL)'
+        : ''
+
+  const ignoreStatusList = anymarketConfig.NO_LOOK_STATUS_TYPE
+
+  const whereIgnoreStatus =
+    ignoreStatusList.length > 0
+      ? `AND UPPER(t.status) NOT IN (${ignoreStatusList
+        .map((s: string) => `'${s}'`)
+        .join(', ')})`
+      : ''
 
   const sql = `
     SELECT
@@ -94,10 +109,10 @@ WHERE
     NOT EXISTS (
         SELECT 1 
         FROM ${coreConfig.DB_NAME_DADOS}.eordchannelp e
-        WHERE e.ordnoweb = t.order_id
-    ) AND e.storeno in (${coreConfig.STORENOS.split(',').map(id => `'${id.trim()}'`).join(', ')})
-ORDER BY 
-    t.order_id;
+        WHERE e.ordnoweb = t.order_id AND e.storeno in (${coreConfig.STORENOS.split(',').map(id => `'${id.trim()}'`).join(', ')})
+    ) ${whereFulfillment}
+      ${whereIgnoreStatus}
+ORDER BY t.order_id
   `
 
   try {

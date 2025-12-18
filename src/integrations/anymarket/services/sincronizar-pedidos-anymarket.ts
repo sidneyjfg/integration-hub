@@ -42,7 +42,7 @@ export const sincronizarPedidosAnymarket = async (): Promise<void> => {
 
     if (pedidosNaoIntegrados.length > 0) {
       const listaNaoIntegrados = pedidosNaoIntegrados.map(p =>
-        `• ${p.ID_ANYMARKET} \n| ${p.MARKETPLACE} \n| ${p.STATUS_ANY}`
+        `|${p.ID_ANYMARKET} \n| ${p.MARKETPLACE} \n| ${p.STATUS_ANY} \n|Fulfillment: ${p.FULFILLMENT}`
       )
 
       const mensagensReenvio =
@@ -56,7 +56,7 @@ export const sincronizarPedidosAnymarket = async (): Promise<void> => {
         '📋 Lista de pedidos não integrados:',
         ...listaNaoIntegrados,
         '',
-        '🔁 Resultado do reenvio:',
+        '🔁 Resultado do reenvio: ',
         ...mensagensReenvio
       ]
 
