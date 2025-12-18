@@ -1,4 +1,5 @@
 import { poolMonitoramento } from "../../../core/db";
+import { coreConfig } from "../../../core/env.schema";
 import { TrayCorpProductBody } from "../../../shared/types";
 
 export async function salvarProdutosTempTraycorp(
@@ -11,7 +12,7 @@ export async function salvarProdutosTempTraycorp(
   }
 
   const sql = `
-    INSERT INTO temp_products (
+    INSERT INTO ${coreConfig.DB_NAME_MONITORAMENTO}.temp_products (
       produtoVarianteId, produtoId, idPaiExterno,
       sku, nome, nomeProdutoPai,
       precoCusto, precoDe, precoPor,

@@ -4,6 +4,7 @@ import {
   AnymarketOrderBody,
   ResultadoComparacaoPedido
 } from '../../../shared/types'
+import { anymarketConfig } from '../env.schema'
 import { formatDateForMysql } from '../utils'
 
 /**
@@ -19,7 +20,7 @@ export async function salvarPedidosAnymarketMonitoramento(
   }
 
   const sql = `
-  INSERT INTO temp_orders
+  INSERT INTO ${coreConfig.DB_NAME_MONITORAMENTO}.temp_orders
     (
       order_id,
       marketplace_id,
@@ -94,7 +95,7 @@ WHERE
         SELECT 1 
         FROM ${coreConfig.DB_NAME_DADOS}.eordchannelp e
         WHERE e.ordnoweb = t.order_id
-    )
+    ) AND e.storeno in (${coreConfig.STORENOS.split(',').map(id => `'${id.trim()}'`).join(', ')})
 ORDER BY 
     t.order_id;
   `

@@ -12,7 +12,7 @@ export const coreEnvSchema = z.object({
   DB_NAME_MONITORAMENTO: z.string(),
 
   ACTIVE_INTEGRATIONS: z.string(),
-
+  STORENOS: z.string().default('1'),
   CRON_PEDIDOS: z.string().optional(),
   CRON_PRODUTOS: z.string().optional(),
   CRON_NOTAS_ML: z.string().optional(),

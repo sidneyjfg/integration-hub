@@ -7,6 +7,7 @@ export async function sincronizarProdutosTraycorp() {
   console.log("[TRAYCORP][SYNC] Iniciando sincronização de produtos");
 
   const produtos = await buscarProdutosTraycorp();
+  const totalBuscados = produtos.length;
 
   let invalidos = 0;
   const validos = [];
@@ -16,7 +17,6 @@ export async function sincronizarProdutosTraycorp() {
       invalidos++;
       continue;
     }
-
     validos.push(produto);
   }
 
@@ -24,10 +24,15 @@ export async function sincronizarProdutosTraycorp() {
     console.log("[TRAYCORP][SYNC] Nenhum produto válido encontrado");
 
     await notifyGoogleChat(
-      "⚠️ Nenhum produto válido encontrado na TrayCorp."
+      `⚠️ *TrayCorp – Sincronização de Produtos*\n\n` +
+      `Total buscados: ${totalBuscados}\n` +
+      `Produtos válidos: 0\n` +
+      `Produtos inválidos: ${invalidos}\n\n` +
+      `Nenhum produto foi inserido.`
     );
 
     return {
+      totalBuscados,
       inseridos: 0,
       invalidos,
     };
@@ -36,11 +41,22 @@ export async function sincronizarProdutosTraycorp() {
   const inseridos = await salvarProdutosTempTraycorp(validos);
 
   console.log("[TRAYCORP][SYNC] Sincronização finalizada", {
+    totalBuscados,
     inseridos,
     invalidos,
   });
 
+  // 📣 NOTIFICAÇÃO FINAL
+  await notifyGoogleChat(
+    `📦 *TrayCorp – Sincronização de Produtos*\n\n` +
+    `Total buscados: ${totalBuscados}\n` +
+    `Produtos válidos: ${validos.length}\n` +
+    `Produtos inseridos: ${inseridos}\n` +
+    `Produtos inválidos (nao foram inseridos): ${invalidos}`
+  );
+
   return {
+    totalBuscados,
     inseridos,
     invalidos,
   };

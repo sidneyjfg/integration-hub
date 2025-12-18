@@ -26,10 +26,7 @@ export async function buscarPedidosPluggto(): Promise<PluggtoOrderBody[]> {
 
   try {
     do {
-      console.log('[PLUGGTO][SYNC] Buscando página', {
-        page,
-        next
-      })
+      console.log('[PLUGGTO][SYNC] Buscando página', { page, next })
 
       const response: AxiosResponse<
         PluggtoApiResponse<PluggtoOrderApi>
@@ -38,8 +35,8 @@ export async function buscarPedidosPluggto(): Promise<PluggtoOrderBody[]> {
         params: {
           limit: 100,
           created: `${from}to${to}`,
-          next: next || undefined,
-        },
+          next: next || undefined
+        }
       })
 
       const lote = response.data.result || []
@@ -50,12 +47,48 @@ export async function buscarPedidosPluggto(): Promise<PluggtoOrderBody[]> {
       })
 
       for (const item of lote) {
+        const o = item.Order
+        const shipment = o.shipments?.[0]
+        const payment = o.payments?.[0]
+
         pedidos.push({
-          ordnoweb: item.Order.id,
-          ordnochannel: item.Order.original_id || '',
-          nfe_key: item.Order.shipments?.[0]?.nfe_key,
-          date: item.Order.created,
-          status: item.Order.status,
+          // ids
+          ordnoweb: o.id,
+          ordnochannel: o.original_id ?? null,
+
+          // status
+          status: o.status,
+
+          // nota fiscal
+          nfe_key: shipment?.nfe_key ?? null,
+          nfe_number: shipment?.nfe_number ?? null,
+          nfe_serie: shipment?.nfe_serie ?? null,
+          nfe_date: shipment?.nfe_date ?? null,
+
+          // valores
+          total: o.total ?? 0,
+          subtotal: o.subtotal ?? null,
+          shipping: o.shipping ?? null,
+          discount: o.discount ?? null,
+          tax: o.tax ?? null,
+          total_paid: o.total_paid ?? null,
+
+          // pagamento
+          payment_type: payment?.payment_type ?? null,
+          payment_method: payment?.payment_method ?? null,
+          payment_installments: payment?.payment_installments
+            ? Number(payment.payment_installments)
+            : null,
+
+          // metadados
+          channel: o.channel,
+          channel_account: o.channel_account ?? null,
+          delivery_type: o.delivery_type ?? null,
+
+          // datas
+          created_at: o.created,
+          approved_at: o.approved_date ?? null,
+          modified_at: o.modified ?? null
         })
       }
 
