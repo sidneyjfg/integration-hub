@@ -10,7 +10,9 @@ export async function BuscaInsightsdePedidoAnyXNerus(): Promise<any[]> {
 
   const sql = `
 SELECT
+    e.date                             AS data_erp,
     t.order_id                         AS order_anymarket,
+    t.fulfillment                      AS fulfillment_anymarket,
     e.ordno                            AS order_erp,
     t.total                            AS total_anymarket,
     SUM(ec.vTotal) / 100               AS total_erp,

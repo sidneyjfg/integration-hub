@@ -24,7 +24,7 @@ export default async function sendFileViaSFTP(
         host: mercadolivreConfig.MERCADOLIVRE_SFTP_HOST,
         port: Number(mercadolivreConfig.MERCADOLIVRE_SFTP_PORT || 22),
         username: mercadolivreConfig.MERCADOLIVRE_SFTP_USER,
-        readyTimeout: 60000
+        readyTimeout: 120000 // ⬅️ aumentamos
       }
 
       if (process.env.SFTP_PRIVATE_KEY_B64) {
@@ -41,7 +41,7 @@ export default async function sendFileViaSFTP(
 
       await sftp.connect(config)
 
-      console.log('[SFTP] Enviando', remotePath)
+      console.log('[SFTP][SINGLE] Enviando', remotePath)
       await sftp.fastPut(file, remotePath)
 
       await sftp.end()
@@ -55,7 +55,7 @@ export default async function sendFileViaSFTP(
       }
 
       console.warn(
-        `[SFTP] Falha tentativa ${tentativa}, retry em 2s`,
+        `[SFTP][SINGLE] Falha tentativa ${tentativa}, retry em 2s`,
         err?.code
       )
 
