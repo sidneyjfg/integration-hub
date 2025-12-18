@@ -3,7 +3,7 @@ import path from 'path'
 import SftpClient from 'ssh2-sftp-client'
 import { mercadolivreConfig } from '../env.schema'
 
-export default async function sendFilesViaSFTP(
+export async function sendFileViaSFTP(
   file: string,
   remoteDir: string,
   tentativas = 3

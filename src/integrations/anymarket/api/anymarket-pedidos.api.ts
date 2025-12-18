@@ -134,6 +134,7 @@ export async function buscarPedidosRecentesAnymarket(): Promise<AnymarketOrderBo
 
     return orders
   } catch (error: unknown) {
+    //status: 503 (Serviço Indisponível da AnyMarket)
     console.error('[ANYMARKET][BUSCA] Erro ao buscar pedidos', error)
     throw error
   }

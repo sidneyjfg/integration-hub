@@ -1,12 +1,57 @@
 import path from 'path'
 import { mercadolivreConfig } from '../../env.schema'
-import { sendFilesViaSFTP } from '../../utils'
 import {
   filtrarPorIgnoreEndFile,
-  filtrarPorTipoNota
+  filtrarPorTipoNota,
+  sendFilesViaSFTP
 } from '../../utils'
 import { ledgerSimples } from '../ledger-simples'
 import { ResultadoEnvio } from '../../../../shared/types'
+
+
+function resolverDiretorioVonder(file: string): string {
+  const lower = file.toLowerCase()
+
+  if (
+    lower.includes('evento') ||
+    lower.includes('procevento') ||
+    lower.includes('inutnfe')
+  ) {
+    return 'IN_EVENTOS'
+  }
+
+  if (
+    lower.includes('cte') ||
+    lower.includes('ct-e') ||
+    lower.includes('proccte')
+  ) {
+    return 'CTE'
+  }
+
+  return 'IN'
+}
+
+async function enviarArquivoVonder(
+  file: string,
+  targetRoot: string
+): Promise<string | null> {
+
+  const nome = path.basename(file)
+
+  if (ledgerSimples.jaEnviado(nome)) {
+    return null
+  }
+
+  const dir = resolverDiretorioVonder(file)
+  const destino = path.posix.join(targetRoot, dir)
+
+  await sendFilesViaSFTP(file, destino)
+
+  // ✅ Ledger somente após sucesso real
+  ledgerSimples.registrar([nome])
+
+  return nome
+}
 
 export async function executarSftpVonder(
   files: string[]
@@ -18,7 +63,6 @@ export async function executarSftpVonder(
     MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA
   } = mercadolivreConfig
 
-  // 1️⃣ Filtros globais
   let filtrados = filtrarPorIgnoreEndFile(
     files,
     MERCADOLIVRE_SFTP_IGNORE_END_FILE
@@ -29,59 +73,31 @@ export async function executarSftpVonder(
     MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA
   )
 
-  // 2️⃣ Ledger (antes)
-  const novos = filtrados.filter(
-    f => !ledgerSimples.jaEnviado(path.basename(f))
-  )
-
-  if (!novos.length) {
-    console.log('[VONDER][SFTP] Nenhum arquivo novo após ledger')
-    return { arquivos: [], total: 0 }
-  }
-
-  // 3️⃣ Classificação
-  const isEventoNFe = (file: string) => {
-    const n = file.toLowerCase()
-    if (n.includes('cte') || n.includes('ct-e')) return false
-    if (n.includes('procevento')) return true
-    if (n.includes('evento') && !n.includes('procnfe')) return true
-    if (n.includes('inutnfe')) return true
-    return false
-  }
-
-  const isCTe = (file: string) => {
-    const n = file.toLowerCase()
-    return n.includes('cte') || n.includes('ct-e') || n.includes('proccte')
-  }
-
-  const join = (dir: string) =>
-    path.posix.join(MERCADOLIVRE_SFTP_DIR!, dir)
-
-  // 4️⃣ Envio sequencial + commit por arquivo
   const enviados: string[] = []
 
-  for (const file of novos) {
-    const nome = path.basename(file)
+  for (const file of filtrados) {
+    try {
+      const enviado = await enviarArquivoVonder(
+        file,
+        MERCADOLIVRE_SFTP_DIR!
+      )
 
-    let dir = 'IN'
-    if (isEventoNFe(file)) dir = 'IN_EVENTOS'
-    else if (isCTe(file)) dir = 'CTE'
-
-    await sendFilesViaSFTP(file, join(dir))
-    ledgerSimples.registrar([nome])
-    enviados.push(nome)
-    ledgerSimples.registrar([nome])
-    enviados.push(nome)
-
-    await new Promise(r => setTimeout(r, 500)) // proteção SFTP frágil
+      if (enviado) {
+        enviados.push(enviado)
+        await new Promise(r => setTimeout(r, 500)) // throttle seguro
+      }
+    } catch (err) {
+      console.error('[VONDER][SFTP] Falha ao enviar arquivo', {
+        file,
+        err
+      })
+      // ⚠️ Não registra ledger, permitindo retry
+    }
   }
-
-  console.log('[VONDER][SFTP] Envio concluído', {
-    total: enviados.length
-  })
 
   return {
     arquivos: enviados,
     total: enviados.length
   }
 }
+
