@@ -2,6 +2,7 @@ import dotenv from 'dotenv'
 dotenv.config() // 🚨 PRIMEIRA LINHA EXECUTÁVEL
 
 import Fastify from 'fastify'
+import cors from '@fastify/cors'
 import { loadIntegrations } from './loader'
 import { integrationsController } from './integrations.controller'
 import { validateCoreEnv } from './env.schema'
@@ -12,7 +13,11 @@ async function bootstrap() {
   const coreConfig = validateCoreEnv()
 
   const app = Fastify({ logger: true })
-
+  // ✅ CORS — AQUI
+  await app.register(cors, {
+    origin: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  })
   app.get('/health', async () => ({ status: 'ok' }))
   app.get('/integrations', integrationsController)
 

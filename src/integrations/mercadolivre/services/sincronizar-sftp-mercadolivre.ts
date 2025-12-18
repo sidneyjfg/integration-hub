@@ -83,7 +83,6 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         continue
       }
 
-      let enviados = 0
       let resultadoEnvio: ResultadoEnvio = { arquivos: [], total: 0 }
 
       switch (modo) {
@@ -103,7 +102,7 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
           resultadoEnvio = await executarSftpLedger(files)
           break
 
-        case 'SFTP_VONDER':
+        case 'SFTP_VONDER_LEDGER':
           resultadoEnvio = await executarSftpVonder(files)
           break
       }

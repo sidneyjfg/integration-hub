@@ -5,7 +5,7 @@ export type ModoEnvio =
   | 'LOCAL_LEDGER'
   | 'SFTP_SIMPLES'
   | 'SFTP_LEDGER'
-  | 'SFTP_VONDER'
+  | 'SFTP_VONDER_LEDGER'
 
 export function resolverModoEnvio(): ModoEnvio {
   const {
@@ -21,7 +21,7 @@ export function resolverModoEnvio(): ModoEnvio {
   }
 
   if (MERCADOLIVRE_IS_VONDER) {
-    return 'SFTP_VONDER'
+    return 'SFTP_VONDER_LEDGER'
   }
 
   return MERCADOLIVRE_USE_LEDGER
