@@ -16,7 +16,7 @@ async function bootstrap() {
   // ✅ CORS — AQUI
   await app.register(cors, {
     origin: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET'],
   })
   app.get('/health', async () => ({ status: 'ok' }))
   app.get('/integrations', integrationsController)
