@@ -33,9 +33,9 @@ export async function executarSftpLedger(
     return { arquivos: [], total: 0 }
   }
 
-  await sendFilesViaSFTP(novos, MERCADOLIVRE_SFTP_DIR!)
+  const enviados = await sendFilesViaSFTP(novos, MERCADOLIVRE_SFTP_DIR!)
 
-  ledgerSimples.registrar(novos.map(f => path.basename(f)))
+  ledgerSimples.registrar(enviados)
 
   return {
     arquivos: novos.map(f => path.basename(f)),

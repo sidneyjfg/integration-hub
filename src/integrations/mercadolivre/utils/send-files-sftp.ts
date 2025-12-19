@@ -5,54 +5,79 @@ import { mercadolivreConfig } from '../env.schema'
 
 export async function sendFilesViaSFTP(
   files: string[],
-  remoteDir: string
-): Promise<void> {
+  remoteDir: string,
+  tentativas = 3
+): Promise<string[]> {
 
-  if (!files.length) return
+  const enviados: string[] = []
+  let index = 0
 
-  const sftp = new SftpClient()
+  while (index < files.length) {
+    let tentativa = 1
 
-  const config: any = {
-    host: mercadolivreConfig.MERCADOLIVRE_SFTP_HOST,
-    port: Number(mercadolivreConfig.MERCADOLIVRE_SFTP_PORT || 22),
-    username: mercadolivreConfig.MERCADOLIVRE_SFTP_USER,
-    readyTimeout: 120000
-  }
+    while (tentativa <= tentativas) {
+      const sftp = new SftpClient()
 
-  if (process.env.SFTP_PRIVATE_KEY_B64) {
-    config.privateKey = Buffer.from(
-      process.env.SFTP_PRIVATE_KEY_B64,
-      'base64'
-    )
-    if (process.env.SFTP_PASSPHRASE) {
-      config.passphrase = process.env.SFTP_PASSPHRASE
-    }
-  } else {
-    config.password = mercadolivreConfig.MERCADOLIVRE_SFTP_PASSWORD
-  }
+      try {
+        const config: any = {
+          host: mercadolivreConfig.MERCADOLIVRE_SFTP_HOST,
+          port: Number(mercadolivreConfig.MERCADOLIVRE_SFTP_PORT || 22),
+          username: mercadolivreConfig.MERCADOLIVRE_SFTP_USER,
+          password: mercadolivreConfig.MERCADOLIVRE_SFTP_PASSWORD,
+          readyTimeout: 180000,
+          keepaliveInterval: 10000,
+          keepaliveCountMax: 3
+        }
 
-  try {
-    await sftp.connect(config)
+        await sftp.connect(config)
 
-    for (const file of files) {
-      if (!fs.existsSync(file)) {
-        console.warn('[SFTP][BATCH] Arquivo não encontrado, ignorando', file)
-        continue
+        // continua do último arquivo não enviado
+        for (; index < files.length; index++) {
+          const file = files[index]
+
+          if (!fs.existsSync(file)) {
+            console.warn('[SFTP][BATCH] Arquivo não encontrado, pulando', file)
+            continue
+          }
+
+          const remotePath = path.posix.join(
+            remoteDir.replace(/\\/g, '/'),
+            path.basename(file)
+          )
+
+          console.log('[SFTP][BATCH] Enviando', remotePath)
+          await sftp.fastPut(file, remotePath)
+
+          enviados.push(path.basename(file))
+
+          // throttle conservador
+          await new Promise(r => setTimeout(r, 600))
+        }
+
+        await sftp.end()
+        return enviados // ✅ todos enviados
+
+      } catch (err) {
+        await sftp.end().catch(() => {})
+
+        console.warn(
+          `[SFTP][BATCH] Erro na conexão (tentativa ${tentativa}/${tentativas}), retomando...`,
+          (err as any)?.code
+        )
+
+        tentativa++
+
+        if (tentativa > tentativas) {
+          throw new Error(
+            `[SFTP][BATCH] Falha definitiva ao enviar arquivos. Enviados até agora: ${enviados.length}/${files.length}`
+          )
+        }
+
+        // backoff real
+        await new Promise(r => setTimeout(r, 5000))
       }
-
-      const remotePath = path.posix.join(
-        remoteDir.replace(/\\/g, '/'),
-        path.basename(file)
-      )
-
-      console.log('[SFTP][BATCH] Enviando', remotePath)
-      await sftp.fastPut(file, remotePath)
-
-      // ⏳ throttle leve para não sobrecarregar o servidor
-      await new Promise(r => setTimeout(r, 600))
     }
-
-  } finally {
-    await sftp.end().catch(() => {})
   }
+
+  return enviados
 }
