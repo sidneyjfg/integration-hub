@@ -1,38 +1,30 @@
+import { formatarDataEmissao } from "../utils/format-time"
+
 type NotaNaoIntegrada = {
   NFE?: string
   SERIE?: string
   EMISSAO?: string | Date
 }
 
-export function buildNotaNaoIntegradaCard(
-  nota: NotaNaoIntegrada,
+export function buildNotasNaoIntegradasCard(
+  notas: NotaNaoIntegrada[],
   clienteId: string
 ) {
-  const dataEmissao = nota.EMISSAO
-    ? new Date(nota.EMISSAO).toLocaleDateString('pt-BR')
-    : '-'
+  const widgets = notas.map(nota => ({
+    keyValue: {
+      topLabel: `${nota.NFE ?? '-'} / ${nota.SERIE ?? '-'}`,
+      content: `📅 ${formatarDataEmissao(nota.EMISSAO)}`
+    }
+  }))
 
   return {
     header: {
-      title: '⚠️ Nota não integrada',
+      title: '⚠️ Notas não integradas',
       subtitle: `Mercado Livre • Conta ${clienteId}`
     },
     sections: [
       {
-        widgets: [
-          {
-            keyValue: {
-              topLabel: 'Nota / Série',
-              content: `${nota.NFE ?? '-'} / ${nota.SERIE ?? '-'}`
-            }
-          },
-          {
-            keyValue: {
-              topLabel: 'Data de emissão',
-              content: dataEmissao
-            }
-          }
-        ]
+        widgets
       }
     ]
   }

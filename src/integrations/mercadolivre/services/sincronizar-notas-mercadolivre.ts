@@ -7,7 +7,7 @@ import {
 import { notifyGoogleChat } from '../notifications/google-chat'
 import { buscarNotasMercadoLivre } from '../api/buscar-notas-mercadolivre'
 import { mercadolivreConfig } from '../env.schema'
-import { buildNotaNaoIntegradaCard } from '../notifications/build-notas-notification'
+import { buildNotasNaoIntegradasCard } from '../notifications/build-notas-notification'
 
 export async function sincronizarNotasMercadoLivre(): Promise<void> {
   console.log('[MERCADOLIVRE][SYNC] Iniciando sincronização de notas')
@@ -98,11 +98,12 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
           )
 
           // 📋 cards por nota
-          const cards = notasNaoIntegradas.map(nota =>
-            buildNotaNaoIntegradaCard(nota, clienteId)
+          const card = buildNotasNaoIntegradasCard(
+            notasNaoIntegradas,
+            clienteId
           )
 
-          await notifyGoogleChat({ cards })
+          await notifyGoogleChat({ cards: [card] })
         }
         else {
           await notifyGoogleChat(
