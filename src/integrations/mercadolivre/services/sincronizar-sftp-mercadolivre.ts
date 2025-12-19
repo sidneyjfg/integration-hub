@@ -115,11 +115,18 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         )
         : notasFiltradas
 
+      const totalEncontradas = notasFiltradas.length
+      const totalEnviadas = usarEnviados
+        ? resultadoEnvio.arquivos.length
+        : notasFiltradas.length
+
       // 📣 NOTIFICAÇÃO — SOMENTE O QUE FOI ENVIADO
       const notification = await buildMercadoLivreSftpNotification({
         clienteId,
         modo,
         notas: notasParaNotificar,
+        totalEncontradas,
+        totalEnviadas,
         startDate,
         endDate,
         targetDir: mercadolivreConfig.MERCADOLIVRE_SFTP_DIR

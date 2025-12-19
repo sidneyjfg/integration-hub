@@ -38,7 +38,7 @@ export async function executarSftpLedger(
   ledgerSimples.registrar(enviados)
 
   return {
-    arquivos: novos.map(f => path.basename(f)),
-    total: novos.length
+    arquivos: enviados,        // ✅ SOMENTE os realmente enviados
+    total: enviados.length
   }
 }

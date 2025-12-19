@@ -4,10 +4,13 @@ type BuildNotificationParams = {
   clienteId: string
   modo: string
   notas: { tipoNota: string }[]
+  totalEncontradas: number
+  totalEnviadas: number
   startDate: string
   endDate: string
   targetDir?: string
 }
+
 
 /**
  * 📣 Monta a notificação do SFTP Mercado Livre
@@ -16,19 +19,19 @@ type BuildNotificationParams = {
 export async function buildMercadoLivreSftpNotification(
   params: BuildNotificationParams
 ): Promise<string> {
-  const { clienteId, modo, notas, startDate, endDate, targetDir } = params
+  const { clienteId, modo, notas, startDate, endDate, targetDir, totalEncontradas, totalEnviadas } = params
 
   const isSftp = modo.includes('SFTP')
 
   // 🔐 Dados do SFTP (somente se envio remoto)
   const sftpInfo = isSftp
     ? (
-        `Servidor SFTP:\n` +
-        `• Host: ${mercadolivreConfig.MERCADOLIVRE_SFTP_HOST}\n` +
-        `• Porta: ${mercadolivreConfig.MERCADOLIVRE_SFTP_PORT}\n` +
-        `• Usuário: ${mercadolivreConfig.MERCADOLIVRE_SFTP_USER}\n` +
-        (targetDir ? `• Diretório: ${targetDir}\n` : '')
-      )
+      `Servidor SFTP:\n` +
+      `• Host: ${mercadolivreConfig.MERCADOLIVRE_SFTP_HOST}\n` +
+      `• Porta: ${mercadolivreConfig.MERCADOLIVRE_SFTP_PORT}\n` +
+      `• Usuário: ${mercadolivreConfig.MERCADOLIVRE_SFTP_USER}\n` +
+      (targetDir ? `• Diretório: ${targetDir}\n` : '')
+    )
     : ''
 
   // 🧠 LEDGER → mensagem resumida
@@ -37,7 +40,8 @@ export async function buildMercadoLivreSftpNotification(
       `📤 *Mercado Livre • ${modo.replace(/_/g, ' ')}*\n` +
       `Cliente: ${clienteId}\n` +
       `Período: ${startDate} → ${endDate}\n` +
-      `Arquivos enviados: ${notas.length}\n\n` +
+      `Total encontradas: ${totalEncontradas}\n` +
+      `Enviadas com sucesso: ${totalEnviadas}\n\n` +
       sftpInfo
     )
   }

@@ -14,6 +14,8 @@ class LedgerSimples {
     const baseDir = path.resolve('./ledger')
     this.ledgerPath = path.join(baseDir, 'mercadolivre-ledger.json')
 
+    console.log('[LEDGER] Path:', this.ledgerPath)   // 👈 ADICIONE
+
     if (!fs.existsSync(baseDir)) {
       fs.mkdirSync(baseDir, { recursive: true })
     }
