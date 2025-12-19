@@ -52,7 +52,7 @@ async function enviarArquivoVonderComClient(
 export async function executarSftpVonder(
   files: string[]
 ): Promise<ResultadoEnvio> {
-
+  console.log('[VONDER][SFTP] Iniciando envio de', files.length, 'arquivos')
   const sftp = new SftpClient()
   const enviados: string[] = []
 

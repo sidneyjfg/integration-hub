@@ -8,7 +8,7 @@ import { sendFilesViaSFTP } from '../../utils/send-files-sftp'
 export async function executarSftpLedger(
   files: string[]
 ): Promise<ResultadoEnvio> {
-
+  console.log('[SFTP][LEDGER] Iniciando envio via SFTP com ledger')
   const {
     MERCADOLIVRE_SFTP_DIR,
     MERCADOLIVRE_SFTP_IGNORE_END_FILE,
@@ -28,7 +28,7 @@ export async function executarSftpLedger(
   const novos = filtrados.filter(
     f => !ledgerSimples.jaEnviado(path.basename(f))
   )
-
+  console.log(novos.length, 'arquivo(s) novos para enviar via SFTP');
   if (!novos.length) {
     return { arquivos: [], total: 0 }
   }

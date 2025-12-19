@@ -12,7 +12,7 @@ import { ResultadoEnvio } from '../../../../shared/types'
 export async function executarLocalLedger(
   files: string[]
 ): Promise<ResultadoEnvio> {
-
+  console.log('[LOCAL][LEDGER] Iniciando envio local com ledger')
   const {
     MERCADOLIVRE_SFTP_DIR,
     MERCADOLIVRE_SFTP_IGNORE_END_FILE,

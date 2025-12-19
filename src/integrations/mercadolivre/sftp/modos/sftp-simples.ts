@@ -5,7 +5,7 @@ import { sendFilesViaSFTP } from '../../utils/send-files-sftp'
 export async function executarSftpSimples(
   files: string[]
 ): Promise<void> {
-
+  console.log('[SFTP][SIMPLES] Iniciando envio via SFTP simples')
   const {
     MERCADOLIVRE_SFTP_DIR,
     MERCADOLIVRE_SFTP_IGNORE_END_FILE,
