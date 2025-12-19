@@ -11,8 +11,11 @@ class LedgerSimples {
   private cache: Set<string>
 
   constructor() {
-    const baseDir = path.resolve('./ledger')
-    this.ledgerPath = path.join(baseDir, 'mercadolivre-ledger.json')
+    const baseDir = process.env.LEDGER_DIR
+      ? path.resolve(process.env.LEDGER_DIR)
+      : path.resolve(process.cwd(), '../ledger')
+    
+      this.ledgerPath = path.join(baseDir, 'mercadolivre-ledger.json')
 
     console.log('[LEDGER] Path:', this.ledgerPath)   // 👈 ADICIONE
 
