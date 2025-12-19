@@ -1,10 +1,6 @@
 import path from 'path'
 import { mercadolivreConfig } from '../../env.schema'
-import {
-  filtrarPorIgnoreEndFile,
-  filtrarPorTipoNota
-} from '../../utils'
-import sendFileViaSFTP from '../../utils/send-file-sftp'
+import SftpClient from 'ssh2-sftp-client'
 import { ledgerSimples } from '../ledger-simples'
 import { ResultadoEnvio } from '../../../../shared/types'
 
@@ -30,7 +26,8 @@ function resolverDiretorioVonder(file: string): string {
   return 'IN'
 }
 
-async function enviarArquivoVonder(
+async function enviarArquivoVonderComClient(
+  sftp: SftpClient,
   file: string,
   targetRoot: string
 ): Promise<string | null> {
@@ -42,54 +39,52 @@ async function enviarArquivoVonder(
   }
 
   const dir = resolverDiretorioVonder(file)
-  const destino = path.posix.join(targetRoot, dir)
+  const destino = path.posix.join(targetRoot, dir, nome)
 
-  await sendFileViaSFTP(file, destino)
+  console.log('[VONDER][SFTP] Enviando', destino)
+  await sftp.fastPut(file, destino)
 
   ledgerSimples.registrar([nome])
-
   return nome
 }
+
 
 export async function executarSftpVonder(
   files: string[]
 ): Promise<ResultadoEnvio> {
 
-  const {
-    MERCADOLIVRE_SFTP_DIR,
-    MERCADOLIVRE_SFTP_IGNORE_END_FILE,
-    MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA
-  } = mercadolivreConfig
-
-  let filtrados = filtrarPorIgnoreEndFile(
-    files,
-    MERCADOLIVRE_SFTP_IGNORE_END_FILE
-  )
-
-  filtrados = await filtrarPorTipoNota(
-    filtrados,
-    MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA
-  )
-
+  const sftp = new SftpClient()
   const enviados: string[] = []
 
-  for (const file of filtrados) {
-    try {
-      const enviado = await enviarArquivoVonder(
-        file,
-        MERCADOLIVRE_SFTP_DIR!
-      )
+  try {
+    await sftp.connect({
+      host: mercadolivreConfig.MERCADOLIVRE_SFTP_HOST,
+      port: Number(mercadolivreConfig.MERCADOLIVRE_SFTP_PORT || 22),
+      username: mercadolivreConfig.MERCADOLIVRE_SFTP_USER,
+      password: mercadolivreConfig.MERCADOLIVRE_SFTP_PASSWORD,
+      readyTimeout: 120000,
+      keepaliveInterval: 10000
+    })
 
-      if (enviado) {
-        enviados.push(enviado)
-        await new Promise(r => setTimeout(r, 500))
+    for (const file of files) {
+      try {
+        const enviado = await enviarArquivoVonderComClient(
+          sftp,
+          file,
+          mercadolivreConfig.MERCADOLIVRE_SFTP_DIR!
+        )
+
+        if (enviado) {
+          enviados.push(enviado)
+          await new Promise(r => setTimeout(r, 300))
+        }
+      } catch (err) {
+        console.error('[VONDER][SFTP] Erro no arquivo', { file, err })
       }
-    } catch (err) {
-      console.error('[VONDER][SFTP] Falha ao enviar arquivo', {
-        file,
-        err
-      })
     }
+
+  } finally {
+    await sftp.end().catch(() => {})
   }
 
   return {
