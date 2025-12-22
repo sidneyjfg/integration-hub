@@ -251,7 +251,7 @@ export async function buscarNotasNaoIntegradasNerusPorChaves(
       t.chave                 AS CHAVE_NFE,
       t.NFe                   AS NFE,
       t.serie                 AS SERIE,
-      t.emissao               AS EMISSAO,
+      DATE_FORMAT(t.emissao, '%Y-%m-%d %H:%i:%s') AS EMISSAO,
       t.valor_total           AS VALOR_TOTAL,
       t.tipo_logistico        AS TIPO_LOGISTICO,
       t.status                AS STATUS,
@@ -263,9 +263,9 @@ export async function buscarNotasNaoIntegradasNerusPorChaves(
         FROM ${coreConfig.DB_NAME_DADOS}.nfeavxml n
         WHERE n.nfkey = t.chave
           AND n.storeno IN (${coreConfig.STORENOS
-            .split(',')
-            .map(id => `'${id.trim()}'`)
-            .join(', ')})
+      .split(',')
+      .map(id => `'${id.trim()}'`)
+      .join(', ')})
       )
     ORDER BY t.emissao DESC
   `
