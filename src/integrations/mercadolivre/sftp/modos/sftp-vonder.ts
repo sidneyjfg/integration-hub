@@ -19,24 +19,28 @@ function agruparPorDiretorio(files: string[]): Agrupamento {
 function resolverDiretorioVonder(file: string): string {
   const nome = path.basename(file).toLowerCase()
 
+  // EVENTOS NFE
   if (
-    nome.includes('evento') ||
-    nome.includes('procevento') ||
-    nome.includes('inutnfe')
+    nome.includes('proceventonfe') ||
+    nome.includes('evento')
   ) {
     return 'IN_EVENTOS'
   }
 
+  // CTE (ct-e, ct_e, cte)
   if (
-    nome.includes('cte') ||
+    nome.includes('ct_e') ||
     nome.includes('ct-e') ||
+    nome.includes('cte') ||
     nome.includes('proccte')
   ) {
     return 'CTE'
   }
 
+  // NF-e padrão
   return 'IN'
 }
+
 
 
 async function enviarArquivoVonderComClient(
