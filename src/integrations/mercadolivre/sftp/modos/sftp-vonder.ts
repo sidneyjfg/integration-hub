@@ -80,6 +80,16 @@ export async function executarSftpVonder(
     `[VONDER][SFTP] Arquivos recebidos: ${totalRecebidos} | Pendentes: ${pendentes.length}`
   )
 
+  // 🔎 DEBUG TEMPORÁRIO — classificação dos primeiros arquivos
+  for (const file of pendentes.slice(0, 10)) {
+    console.log(
+      '[DEBUG][CLASSIFICACAO]',
+      path.basename(file),
+      '→',
+      resolverDiretorioVonder(file)
+    )
+  }
+
   if (!pendentes.length) {
     console.log('[VONDER][SFTP] Nenhum arquivo novo para envio')
     return { arquivos: [], total: 0 }
@@ -141,7 +151,7 @@ export async function executarSftpVonder(
       }
     }
   } finally {
-    await sftp.end().catch(() => {})
+    await sftp.end().catch(() => { })
     console.log('[VONDER][SFTP] Conexão encerrada')
   }
 
