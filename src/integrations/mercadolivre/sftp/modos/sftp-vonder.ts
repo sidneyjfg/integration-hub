@@ -4,6 +4,18 @@ import SftpClient from 'ssh2-sftp-client'
 import { ledgerSimples } from '../ledger-simples'
 import { ResultadoEnvio } from '../../../../shared/types'
 
+type Agrupamento = Record<string, string[]>
+
+function agruparPorDiretorio(files: string[]): Agrupamento {
+  return files.reduce<Agrupamento>((acc, file) => {
+    const dir = resolverDiretorioVonder(file)
+    acc[dir] ??= []
+    acc[dir].push(file)
+    return acc
+  }, {})
+}
+
+
 function resolverDiretorioVonder(file: string): string {
   const nome = path.basename(file).toLowerCase()
 
@@ -53,11 +65,35 @@ async function enviarArquivoVonderComClient(
 export async function executarSftpVonder(
   files: string[]
 ): Promise<ResultadoEnvio> {
-  console.log('[VONDER][SFTP] Iniciando envio de', files.length, 'arquivos')
+  const totalRecebidos = files.length
+
+  // remove os já enviados (ledger)
+  const pendentes = files.filter(
+    f => !ledgerSimples.jaEnviado(path.basename(f))
+  )
+
+  console.log(
+    `[VONDER][SFTP] Arquivos recebidos: ${totalRecebidos} | Pendentes: ${pendentes.length}`
+  )
+
+  if (!pendentes.length) {
+    console.log('[VONDER][SFTP] Nenhum arquivo novo para envio')
+    return { arquivos: [], total: 0 }
+  }
+
+  // agrupa por diretório
+  const agrupados = agruparPorDiretorio(pendentes)
+
+  console.log('[VONDER][SFTP] Distribuição por diretório:')
+  for (const [dir, list] of Object.entries(agrupados)) {
+    console.log(`  - ${dir}: ${list.length}`)
+  }
+
   const sftp = new SftpClient()
   const enviados: string[] = []
 
   try {
+    console.log('[VONDER][SFTP] Conectando ao servidor...')
     await sftp.connect({
       host: mercadolivreConfig.MERCADOLIVRE_SFTP_HOST,
       port: Number(mercadolivreConfig.MERCADOLIVRE_SFTP_PORT || 22),
@@ -67,8 +103,22 @@ export async function executarSftpVonder(
       keepaliveInterval: 10000
     })
 
-    for (const file of files) {
+    console.log('[VONDER][SFTP] Conectado com sucesso')
+
+    let contador = 0
+    const totalEnvio = pendentes.length
+
+    for (const file of pendentes) {
+      contador++
+
+      const nome = path.basename(file)
+      const dir = resolverDiretorioVonder(file)
+
       try {
+        console.log(
+          `[VONDER][SFTP] (${contador}/${totalEnvio}) Enviando ${nome} → ${dir}`
+        )
+
         const enviado = await enviarArquivoVonderComClient(
           sftp,
           file,
@@ -80,16 +130,24 @@ export async function executarSftpVonder(
           await new Promise(r => setTimeout(r, 300))
         }
       } catch (err) {
-        console.error('[VONDER][SFTP] Erro no arquivo', { file, err })
+        console.error(
+          `[VONDER][SFTP] (${contador}/${totalEnvio}) Erro no arquivo ${nome}`,
+          err
+        )
       }
     }
-
   } finally {
     await sftp.end().catch(() => {})
+    console.log('[VONDER][SFTP] Conexão encerrada')
   }
+
+  console.log(
+    `[VONDER][SFTP] Envio finalizado: ${enviados.length}/${pendentes.length} arquivos enviados`
+  )
 
   return {
     arquivos: enviados,
     total: enviados.length
   }
 }
+
