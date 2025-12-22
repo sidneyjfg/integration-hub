@@ -5,26 +5,27 @@ import { ledgerSimples } from '../ledger-simples'
 import { ResultadoEnvio } from '../../../../shared/types'
 
 function resolverDiretorioVonder(file: string): string {
-  const lower = file.toLowerCase()
+  const nome = path.basename(file).toLowerCase()
 
   if (
-    lower.includes('evento') ||
-    lower.includes('procevento') ||
-    lower.includes('inutnfe')
+    nome.includes('evento') ||
+    nome.includes('procevento') ||
+    nome.includes('inutnfe')
   ) {
     return 'IN_EVENTOS'
   }
 
   if (
-    lower.includes('cte') ||
-    lower.includes('ct-e') ||
-    lower.includes('proccte')
+    nome.includes('cte') ||
+    nome.includes('ct-e') ||
+    nome.includes('proccte')
   ) {
     return 'CTE'
   }
 
   return 'IN'
 }
+
 
 async function enviarArquivoVonderComClient(
   sftp: SftpClient,

@@ -14,15 +14,16 @@ export function resolverModoEnvio(): ModoEnvio {
     MERCADOLIVRE_IS_VONDER
   } = mercadolivreConfig
 
+  if (MERCADOLIVRE_IS_VONDER) {
+    return 'SFTP_VONDER_LEDGER'
+  }
   if (!MERCADOLIVRE_SFTP_ENABLED) {
     return MERCADOLIVRE_USE_LEDGER
       ? 'LOCAL_LEDGER'
       : 'LOCAL_SIMPLES'
   }
 
-  if (MERCADOLIVRE_IS_VONDER) {
-    return 'SFTP_VONDER_LEDGER'
-  }
+
 
   return MERCADOLIVRE_USE_LEDGER
     ? 'SFTP_LEDGER'
