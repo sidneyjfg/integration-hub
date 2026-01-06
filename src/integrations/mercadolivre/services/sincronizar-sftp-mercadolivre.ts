@@ -133,10 +133,19 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
           break
       }
 
+      // ✅ A PARTIR DAQUI JÁ SABEMOS O QUE FOI ENVIADO
+
+      const arquivosEnviadosSet = new Set(resultadoEnvio.arquivos)
+
+      const notasEnviadas = notasFiltradas.filter(n =>
+        n.filePath &&
+        arquivosEnviadosSet.has(path.basename(n.filePath))
+      )
+
       // 🔎 RESUMO REAL POR TIPO (somente VONDER)
       let resumoPorTipo: Record<string, number> | undefined
 
-      if (isVonder) {
+      if (modo === 'SFTP_VONDER_LEDGER') {
         resumoPorTipo = resultadoEnvio.arquivos.reduce<Record<string, number>>(
           (acc, nome) => {
             const tipo = classificarArquivoVonder(nome)
@@ -147,17 +156,15 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         )
       }
 
-      const arquivosEnviadosSet = new Set(resultadoEnvio.arquivos)
-
-      const notasEnviadas = notasFiltradas.filter(n =>
-        n.filePath && arquivosEnviadosSet.has(path.basename(n.filePath))
-      )
-
+      // 📣 AGORA SIM monta a notificação com DADOS REAIS
       const notification = await buildMercadoLivreSftpNotification({
         clienteId,
         modo,
-        notas: isVonder ? [] : notasEnviadas,
-        totalEncontradas: isVonder ? files.length : notasFiltradas.length,
+        notas: modo === 'SFTP_VONDER_LEDGER' ? [] : notasEnviadas,
+        totalEncontradas:
+          modo === 'LOCAL_LEDGER'
+            ? notasFiltradas.length
+            : files.length,
         totalEnviadas: resultadoEnvio.arquivos.length,
         startDate,
         endDate,
@@ -165,8 +172,8 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         resumoPorTipo
       })
 
-
       await notifyGoogleChat(notification)
+
 
     } catch (err) {
       console.error('[MERCADOLIVRE][SFTP] Erro ao processar cliente', {
