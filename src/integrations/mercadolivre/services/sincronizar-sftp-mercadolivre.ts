@@ -19,6 +19,7 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
 
   const modo = resolverModoEnvio()
   console.log('[MERCADOLIVRE][SFTP] Modo selecionado:', modo)
+  const isSftpMode = modo.startsWith('SFTP')
 
   const clienteIds =
     mercadolivreConfig.MERCADOLIVRE_CLIENTE_ID.split(',').map(s => s.trim())
@@ -63,20 +64,27 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         n => !ignoreTipos.includes(n.tipoNota)
       )
 
+      // 📄 NF-e vindas do extract (sempre)
       let files = notasFiltradas
         .map(n => n.filePath)
         .filter(Boolean) as string[]
 
+      // 📦 Se for SFTP, inclui também CTE / EVENTOS direto do disco
+      if (isSftpMode) {
+        const extractRoot = path.resolve('./notas/xml')
+        const allXmlFiles = await getAllXmlFiles(extractRoot)
+
+        // adiciona somente os que ainda não estão na lista
+        const extras = allXmlFiles.filter(f => !files.includes(f))
+
+        files.push(...extras)
+      }
+
+      // aplica filtros finais
       files = filtrarPorIgnoreEndFile(
         files,
         mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE
       )
-
-      // 🔁 fallback legado (somente se não veio nada do extract)
-      if (!files.length) {
-        const extractRoot = path.resolve('./notas/xml')
-        files = await getAllXmlFiles(extractRoot)
-      }
 
       if (!files.length) {
         console.log('[MERCADOLIVRE][SFTP] Nenhum XML encontrado', { clienteId })
