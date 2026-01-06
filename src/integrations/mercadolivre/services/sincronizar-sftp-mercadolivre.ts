@@ -14,11 +14,32 @@ import { executarSftpLedger } from '../sftp/modos/sftp-ledger'
 import { executarSftpVonder } from '../sftp/modos/sftp-vonder'
 import { ResultadoEnvio } from '../../../shared/types'
 
+function classificarArquivoVonder(file: string): 'IN' | 'CTE' | 'IN_EVENTOS' {
+  const nome = file.toLowerCase()
+
+  if (nome.includes('evento') || nome.includes('proceventonfe')) {
+    return 'IN_EVENTOS'
+  }
+
+  if (
+    nome.includes('ct_e') ||
+    nome.includes('ct-e') ||
+    nome.includes('cte') ||
+    nome.includes('proccte')
+  ) {
+    return 'CTE'
+  }
+
+  return 'IN'
+}
+
 export async function sincronizarSFTPMercadoLivre(): Promise<void> {
   console.log('[MERCADOLIVRE][SFTP] Iniciando sincronização SFTP')
 
   const modo = resolverModoEnvio()
   console.log('[MERCADOLIVRE][SFTP] Modo selecionado:', modo)
+
+  const isVonder = modo === 'SFTP_VONDER_LEDGER'
   const isSftpMode = modo.startsWith('SFTP')
 
   const clienteIds =
@@ -64,23 +85,20 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         n => !ignoreTipos.includes(n.tipoNota)
       )
 
-      // 📄 NF-e vindas do extract (sempre)
+      // 📄 NF-e vindas do extract
       let files = notasFiltradas
         .map(n => n.filePath)
         .filter(Boolean) as string[]
 
-      // 📦 Se for SFTP, inclui também CTE / EVENTOS direto do disco
+      // 📦 VONDER → inclui TODOS os XML (CTE + EVENTOS)
       if (isSftpMode) {
         const extractRoot = path.resolve('./notas/xml')
         const allXmlFiles = await getAllXmlFiles(extractRoot)
 
-        // adiciona somente os que ainda não estão na lista
         const extras = allXmlFiles.filter(f => !files.includes(f))
-
         files.push(...extras)
       }
 
-      // aplica filtros finais
       files = filtrarPorIgnoreEndFile(
         files,
         mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE
@@ -115,29 +133,30 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
           break
       }
 
-      const usarEnviados = modo.includes('_LEDGER')
+      // 🔎 RESUMO REAL POR TIPO (somente VONDER)
+      let resumoPorTipo: Record<string, number> | undefined
 
-      const notasParaNotificar = usarEnviados
-        ? notasFiltradas.filter(n =>
-          resultadoEnvio.arquivos.includes(path.basename(n.filePath!))
+      if (isVonder) {
+        resumoPorTipo = resultadoEnvio.arquivos.reduce<Record<string, number>>(
+          (acc, nome) => {
+            const tipo = classificarArquivoVonder(nome)
+            acc[tipo] = (acc[tipo] || 0) + 1
+            return acc
+          },
+          {}
         )
-        : notasFiltradas
+      }
 
-      const totalEncontradas = notasFiltradas.length
-      const totalEnviadas = usarEnviados
-        ? resultadoEnvio.arquivos.length
-        : notasFiltradas.length
-
-      // 📣 NOTIFICAÇÃO — SOMENTE O QUE FOI ENVIADO
       const notification = await buildMercadoLivreSftpNotification({
         clienteId,
         modo,
-        notas: notasParaNotificar,
-        totalEncontradas,
-        totalEnviadas,
+        notas: isVonder ? [] : notasFiltradas,
+        totalEncontradas: isVonder ? files.length : notasFiltradas.length,
+        totalEnviadas: resultadoEnvio.arquivos.length,
         startDate,
         endDate,
-        targetDir: mercadolivreConfig.MERCADOLIVRE_SFTP_DIR
+        targetDir: mercadolivreConfig.MERCADOLIVRE_SFTP_DIR,
+        resumoPorTipo
       })
 
       await notifyGoogleChat(notification)
@@ -151,8 +170,6 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
       await notifyGoogleChat(
         `❌ Erro no SFTP Mercado Livre • Cliente ${clienteId}`
       )
-
-      continue
     }
   }
 

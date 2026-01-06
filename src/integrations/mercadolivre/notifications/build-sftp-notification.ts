@@ -9,44 +9,53 @@ type BuildNotificationParams = {
   startDate: string
   endDate: string
   targetDir?: string
+  resumoPorTipo?: Record<string, number>
 }
 
-
-/**
- * 📣 Monta a notificação do SFTP Mercado Livre
- * Baseada EXCLUSIVAMENTE nas notas realmente enviadas
- */
 export async function buildMercadoLivreSftpNotification(
   params: BuildNotificationParams
 ): Promise<string> {
-  const { clienteId, modo, notas, startDate, endDate, targetDir, totalEncontradas, totalEnviadas } = params
+  const {
+    clienteId,
+    modo,
+    notas,
+    startDate,
+    endDate,
+    targetDir,
+    totalEncontradas,
+    totalEnviadas,
+    resumoPorTipo
+  } = params
 
   const isSftp = modo.includes('SFTP')
 
-  // 🔐 Dados do SFTP (somente se envio remoto)
   const sftpInfo = isSftp
     ? (
-      `Servidor SFTP:\n` +
-      `• Host: ${mercadolivreConfig.MERCADOLIVRE_SFTP_HOST}\n` +
-      `• Porta: ${mercadolivreConfig.MERCADOLIVRE_SFTP_PORT}\n` +
-      `• Usuário: ${mercadolivreConfig.MERCADOLIVRE_SFTP_USER}\n` +
-      (targetDir ? `• Diretório: ${targetDir}\n` : '')
-    )
+        `Servidor SFTP:\n` +
+        `• Host: ${mercadolivreConfig.MERCADOLIVRE_SFTP_HOST}\n` +
+        `• Porta: ${mercadolivreConfig.MERCADOLIVRE_SFTP_PORT}\n` +
+        `• Usuário: ${mercadolivreConfig.MERCADOLIVRE_SFTP_USER}\n` +
+        (targetDir ? `• Diretório: ${targetDir}\n` : '')
+      )
     : ''
 
-  // 🧠 LEDGER → mensagem resumida
-  if (modo.includes('LEDGER')) {
+  // 🔥 CASO ESPECIAL — VONDER
+  if (modo === 'SFTP_VONDER_LEDGER' && resumoPorTipo) {
+    const { IN = 0, CTE = 0, IN_EVENTOS = 0 } = resumoPorTipo
+
     return (
-      `📤 *Mercado Livre • ${modo.replace(/_/g, ' ')}*\n` +
+      `📤 *Mercado Livre • SFTP VONDER LEDGER*\n` +
       `Cliente: ${clienteId}\n` +
-      `Período: ${startDate} → ${endDate}\n` +
-      `Total encontradas: ${totalEncontradas}\n` +
-      `Enviadas com sucesso: ${totalEnviadas}\n\n` +
+      `Período: ${startDate} → ${endDate}\n\n` +
+      `📂 IN (NF-e): ${IN}\n` +
+      `📦 CTE: ${CTE}\n` +
+      `🧾 IN_EVENTOS: ${IN_EVENTOS}\n\n` +
+      `📊 Total enviados: ${totalEnviadas}\n\n` +
       sftpInfo
     )
   }
 
-  // 🧠 AGRUPAMENTO POR TIPO DE NOTA
+  // 🧠 DEMAIS MODOS — POR NOTA
   const counters = notas.reduce<Record<string, number>>((acc, n) => {
     acc[n.tipoNota] = (acc[n.tipoNota] || 0) + 1
     return acc
