@@ -147,10 +147,16 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         )
       }
 
+      const arquivosEnviadosSet = new Set(resultadoEnvio.arquivos)
+
+      const notasEnviadas = notasFiltradas.filter(n =>
+        n.filePath && arquivosEnviadosSet.has(path.basename(n.filePath))
+      )
+
       const notification = await buildMercadoLivreSftpNotification({
         clienteId,
         modo,
-        notas: isVonder ? [] : notasFiltradas,
+        notas: isVonder ? [] : notasEnviadas,
         totalEncontradas: isVonder ? files.length : notasFiltradas.length,
         totalEnviadas: resultadoEnvio.arquivos.length,
         startDate,
@@ -158,6 +164,7 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         targetDir: mercadolivreConfig.MERCADOLIVRE_SFTP_DIR,
         resumoPorTipo
       })
+
 
       await notifyGoogleChat(notification)
 
