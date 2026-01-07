@@ -81,7 +81,7 @@ services:
       STORENO: "1"
       NERUS_RECEIVE_ORDER_URL: https://nerus.com.br/api/receive-order
 
-      # 🟣 TRAYCORP
+      # TRAYCORP
       TRAY_URL: https://api.tray.com.br
       TRAY_TOKEN: ""
       

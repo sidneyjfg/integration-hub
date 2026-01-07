@@ -31,14 +31,24 @@ export async function buildMercadoLivreSftpNotification(
 
   const sftpInfo = isSftp
     ? (
-        `Servidor SFTP:\n` +
-        `• Host: ${mercadolivreConfig.MERCADOLIVRE_SFTP_HOST}\n` +
-        `• Porta: ${mercadolivreConfig.MERCADOLIVRE_SFTP_PORT}\n` +
-        `• Usuário: ${mercadolivreConfig.MERCADOLIVRE_SFTP_USER}\n` +
-        (targetDir ? `• Diretório: ${targetDir}\n` : '')
-      )
+      `Servidor SFTP:\n` +
+      `• Host: ${mercadolivreConfig.MERCADOLIVRE_SFTP_HOST}\n` +
+      `• Porta: ${mercadolivreConfig.MERCADOLIVRE_SFTP_PORT}\n` +
+      `• Usuário: ${mercadolivreConfig.MERCADOLIVRE_SFTP_USER}\n` +
+      (targetDir ? `• Diretório: ${targetDir}\n` : '')
+    )
     : ''
 
+  // 🔒 LOCAL LEDGER — resumo simples (sem tipo de nota)
+  if (modo === 'LOCAL_LEDGER') {
+    return (
+      `📤 *Mercado Livre • LOCAL LEDGER*\n` +
+      `Cliente: ${clienteId}\n` +
+      `Período: ${startDate} → ${endDate}\n\n` +
+      `📥 Total encontradas: ${totalEncontradas}\n` +
+      `📤 Total enviadas (novas): ${totalEnviadas}\n`
+    )
+  }
   // 🔥 CASO ESPECIAL — VONDER
   if (modo === 'SFTP_VONDER_LEDGER' && resumoPorTipo) {
     const { IN = 0, CTE = 0, IN_EVENTOS = 0 } = resumoPorTipo

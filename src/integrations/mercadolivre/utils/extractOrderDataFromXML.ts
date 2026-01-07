@@ -16,10 +16,20 @@ function mapTipoNotaFromNatOp(natOp: string): string {
     .toLowerCase()
 
   // 🔹 DEVOLUÇÃO
-  if (n.includes('devolucao') || n.includes('insucesso')) {
+  if (n.includes('devolucao') || n.includes('Devolucao') || n.includes('insucesso')) {
     return 'devolucao'
   }
 
+  // 🔹 VENDA / FATURAMENTO
+  if (
+    n.includes('venda') ||
+    n.includes('comercializacao') ||
+    n.includes('comercialização') ||
+    n.includes('faturamento') ||
+    n.includes('saida')
+  ) {
+    return 'venda'
+  }
   // 🔹 RETORNO (depósito / simbólico)
   if (
     n.includes('retorno') ||
@@ -34,22 +44,6 @@ function mapTipoNotaFromNatOp(natOp: string): string {
     n.includes('transferencia')
   ) {
     return 'remessa'
-  }
-
-  // 🔹 VENDA / FATURAMENTO
-  if (
-    n.includes('venda') ||
-    n.includes('comercializacao') ||
-    n.includes('comercialização') ||
-    n.includes('faturamento') ||
-      n.includes('saida')
-  ) {
-    return 'venda'
-  }
-
-  // 🔹 OUTRAS ENTRADAS
-  if (n.includes('entrada')) {
-    return 'entrada'
   }
 
   return n
