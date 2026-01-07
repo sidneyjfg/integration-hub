@@ -60,7 +60,10 @@ export const sincronizarPedidosAnymarket = async (): Promise<void> => {
         ...mensagensReenvio
       ]
 
-      await notifyGoogleChat(mensagemFinal.join('\n'))
+      await notifyGoogleChat(
+        mensagemFinal.join('\n'),
+        pedidosNaoIntegrados.length
+      )
     }
     else {
       console.log('[ANYMARKET][SYNC] Todos os pedidos integrados')
