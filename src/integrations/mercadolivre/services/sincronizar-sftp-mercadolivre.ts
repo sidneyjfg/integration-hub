@@ -156,9 +156,22 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         )
       }
 
-      const temFiltroTipoNota = ignoreTipos.length > 0
+      const temFiltro =
+        Boolean(
+          mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA &&
+          mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean).length > 0
+        ) ||
+        Boolean(
+          mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE &&
+          mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean).length > 0
+        )
 
-      // 📣 AGORA SIM monta a notificação com DADOS REAIS
       const notification = await buildMercadoLivreSftpNotification({
         clienteId,
         modo,
@@ -172,7 +185,7 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         endDate,
         targetDir: mercadolivreConfig.MERCADOLIVRE_SFTP_DIR,
         resumoPorTipo,
-        temFiltroTipoNota
+        temFiltro
       })
 
       await notifyGoogleChat(notification)

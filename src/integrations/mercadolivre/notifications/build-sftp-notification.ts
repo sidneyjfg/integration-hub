@@ -10,7 +10,7 @@ type BuildNotificationParams = {
   endDate: string
   targetDir?: string
   resumoPorTipo?: Record<string, number>
-  temFiltroTipoNota?: boolean
+  temFiltro?: boolean
 }
 
 
@@ -27,7 +27,7 @@ export async function buildMercadoLivreSftpNotification(
     totalEncontradas,
     totalEnviadas,
     resumoPorTipo,
-    temFiltroTipoNota
+    temFiltro
   } = params
 
   const isSftp = modo.includes('SFTP')
@@ -46,7 +46,7 @@ export async function buildMercadoLivreSftpNotification(
   // 🔒 LOCAL LEDGER
   if (modo === 'LOCAL_LEDGER') {
     // 👉 SEM filtro → resumo simples
-    if (!temFiltroTipoNota) {
+    if (!temFiltro) {
       return (
         `📤 *Mercado Livre • LOCAL LEDGER*\n` +
         `Cliente: ${clienteId}\n` +
