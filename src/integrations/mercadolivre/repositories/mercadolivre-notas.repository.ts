@@ -247,28 +247,32 @@ export async function buscarNotasNaoIntegradasNerusPorChaves(
   const placeholders = chaves.map(() => '?').join(', ')
 
   const sql = `
-    SELECT
-      t.chave                 AS CHAVE_NFE,
-      t.NFe                   AS NFE,
-      t.serie                 AS SERIE,
-      DATE_FORMAT(t.emissao, '%Y-%m-%d %H:%i:%s') AS EMISSAO,
-      t.valor_total           AS VALOR_TOTAL,
-      t.tipo_logistico        AS TIPO_LOGISTICO,
-      t.status                AS STATUS,
-      t.modalidade            AS MODALIDADE
-    FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas t
-    WHERE t.chave IN (${placeholders})
-      AND NOT EXISTS (
-        SELECT 1
-        FROM ${coreConfig.DB_NAME_DADOS}.nfeavxml n
-        WHERE n.nfkey = t.chave
-          AND n.storeno IN (${coreConfig.STORENOS
+  SELECT
+    t.chave AS CHAVE_NFE,
+    t.NFe   AS NFE,
+    t.serie AS SERIE,
+    DATE_FORMAT(
+      STR_TO_DATE(t.emissao, '%d/%m/%Y %H:%i:%s'),
+      '%Y-%m-%d %H:%i:%s'
+    ) AS EMISSAO,
+    t.valor_total    AS VALOR_TOTAL,
+    t.tipo_logistico AS TIPO_LOGISTICO,
+    t.status         AS STATUS,
+    t.modalidade     AS MODALIDADE
+  FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas t
+  WHERE t.chave IN (${placeholders})
+    AND NOT EXISTS (
+      SELECT 1
+      FROM ${coreConfig.DB_NAME_DADOS}.nfeavxml n
+      WHERE n.nfkey = t.chave
+        AND n.storeno IN (${coreConfig.STORENOS
       .split(',')
       .map(id => `'${id.trim()}'`)
       .join(', ')})
-      )
-    ORDER BY t.emissao DESC
-  `
+    )
+  ORDER BY
+    STR_TO_DATE(t.emissao, '%d/%m/%Y %H:%i:%s') DESC
+`
 
   const [rows] = await poolMonitoramento.query(sql, chaves)
 
