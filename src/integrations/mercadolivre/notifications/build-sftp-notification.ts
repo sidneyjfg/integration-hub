@@ -10,7 +10,9 @@ type BuildNotificationParams = {
   endDate: string
   targetDir?: string
   resumoPorTipo?: Record<string, number>
+  temFiltroTipoNota?: boolean
 }
+
 
 export async function buildMercadoLivreSftpNotification(
   params: BuildNotificationParams
@@ -24,7 +26,8 @@ export async function buildMercadoLivreSftpNotification(
     targetDir,
     totalEncontradas,
     totalEnviadas,
-    resumoPorTipo
+    resumoPorTipo,
+    temFiltroTipoNota
   } = params
 
   const isSftp = modo.includes('SFTP')
@@ -40,13 +43,38 @@ export async function buildMercadoLivreSftpNotification(
     : ''
 
   // 🔒 LOCAL LEDGER — resumo simples (sem tipo de nota)
+  // 🔒 LOCAL LEDGER
   if (modo === 'LOCAL_LEDGER') {
+    // 👉 SEM filtro → resumo simples
+    if (!temFiltroTipoNota) {
+      return (
+        `📤 *Mercado Livre • LOCAL LEDGER*\n` +
+        `Cliente: ${clienteId}\n` +
+        `Período: ${startDate} → ${endDate}\n\n` +
+        `📥 Total encontradas: ${totalEncontradas}\n` +
+        `📤 Total enviadas (novas): ${totalEnviadas}\n`
+      )
+    }
+
+    // 👉 COM filtro → detalha tipos enviados
+    const counters = notas.reduce<Record<string, number>>((acc, n) => {
+      acc[n.tipoNota] = (acc[n.tipoNota] || 0) + 1
+      return acc
+    }, {})
+
+    const detalhes =
+      Object.keys(counters).length > 0
+        ? Object.entries(counters)
+          .map(([tipo, total]) => `📂 ${total} arquivo(s) de ${tipo}`)
+          .join('\n')
+        : '⚠️ Nenhum arquivo novo enviado após filtros'
+
     return (
       `📤 *Mercado Livre • LOCAL LEDGER*\n` +
       `Cliente: ${clienteId}\n` +
       `Período: ${startDate} → ${endDate}\n\n` +
-      `📥 Total encontradas: ${totalEncontradas}\n` +
-      `📤 Total enviadas (novas): ${totalEnviadas}\n`
+      `${detalhes}\n\n` +
+      `📊 Total enviados (novos): ${totalEnviadas}\n`
     )
   }
   // 🔥 CASO ESPECIAL — VONDER

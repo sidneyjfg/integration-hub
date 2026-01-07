@@ -156,6 +156,8 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         )
       }
 
+      const temFiltroTipoNota = ignoreTipos.length > 0
+
       // 📣 AGORA SIM monta a notificação com DADOS REAIS
       const notification = await buildMercadoLivreSftpNotification({
         clienteId,
@@ -169,7 +171,8 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
         startDate,
         endDate,
         targetDir: mercadolivreConfig.MERCADOLIVRE_SFTP_DIR,
-        resumoPorTipo
+        resumoPorTipo,
+        temFiltroTipoNota
       })
 
       await notifyGoogleChat(notification)
