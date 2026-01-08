@@ -14,6 +14,7 @@ export async function sincronizarPedidosPluggto() {
 
     if (pedidos.length === 0) {
         console.log('[PLUGGTO][SYNC] Nenhum pedido encontrado')
+        await notifyGoogleChat('✅ Nenhum pedido encontrado na Pluggto')
         return
     }
 
