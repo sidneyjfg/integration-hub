@@ -14,7 +14,7 @@ SELECT
     t.order_id                         AS order_anymarket,
     t.fulfillment                      AS fulfillment_anymarket,
     e.ordno                            AS order_erp,
-    e.s9tatus                          AS fulfillment_erp,
+    e.s9                               AS fulfillment_erp,
     t.total                            AS total_anymarket,
     SUM(ec.vTotal) / 100               AS total_erp,
     CASE
