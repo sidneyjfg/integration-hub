@@ -133,17 +133,21 @@ export async function buscarPedidosNaoIntegrados():
   console.log('[PLUGGTO][SYNC][DB] Buscando pedidos não integrados')
 
   const sql = `
-    SELECT
-      t.ordnoweb,
-      t.status,
-      DATE_FORMAT(t.date, '%d/%m/%Y %H:%i:%s') AS date,
-      t.total_paid
-    FROM ${coreConfig.DB_NAME_MONITORAMENTO}.temp_orders t
-    LEFT JOIN ${coreConfig.DB_NAME_DADOS}.eordchannelp e
-      ON t.ordnoweb = e.ordnoweb
-    WHERE e.ordnoweb IS NULL and e.storeno in(${coreConfig.STORENOS.split(',').map(s => `'${s.trim()}'`).join(',')})
-    ORDER BY t.date DESC
-  `
+  SELECT
+    t.ordnoweb,
+    t.status,
+    DATE_FORMAT(t.date, '%d/%m/%Y %H:%i:%s') AS date,
+    t.total_paid
+  FROM ${coreConfig.DB_NAME_MONITORAMENTO}.temp_orders t
+  LEFT JOIN ${coreConfig.DB_NAME_DADOS}.eordchannelp e
+    ON t.ordnoweb = e.ordnoweb
+   AND e.storeno IN (${coreConfig.STORENOS
+     .split(',')
+     .map(s => `'${s.trim()}'`)
+     .join(',')})
+  WHERE e.ordnoweb IS NULL
+  ORDER BY t.date DESC
+`
 
   const [rows] = await poolMonitoramento.query(sql)
 
