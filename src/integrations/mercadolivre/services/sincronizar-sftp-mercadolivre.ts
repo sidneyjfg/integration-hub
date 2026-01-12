@@ -73,7 +73,8 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
           clienteId,
           accessToken,
           refreshToken,
-          endOverride: mercadolivreConfig.MERCADOLIVRE_END_SFTP
+          endOverride: mercadolivreConfig.MERCADOLIVRE_END_SFTP,
+          sftpMode: true
         })
 
       const ignoreTipos =

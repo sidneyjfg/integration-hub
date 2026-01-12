@@ -16,21 +16,11 @@ function mapTipoNotaFromNatOp(natOp: string): string {
     .toLowerCase()
 
   // 🔹 DEVOLUÇÃO
-  if (n.includes('devolucao') || n.includes('Devolucao') || n.includes('insucesso')) {
+  if (n.includes('devolucao') || n.includes('insucesso')) {
     return 'devolucao'
   }
 
-  // 🔹 VENDA / FATURAMENTO
-  if (
-    n.includes('venda') ||
-    n.includes('comercializacao') ||
-    n.includes('comercialização') ||
-    n.includes('faturamento') ||
-    n.includes('saida')
-  ) {
-    return 'venda'
-  }
-  // 🔹 RETORNO (depósito / simbólico)
+  // 🔹 RETORNO (PRIORIDADE ALTA)
   if (
     n.includes('retorno') ||
     n.includes('deposito temporario')
@@ -38,7 +28,7 @@ function mapTipoNotaFromNatOp(natOp: string): string {
     return 'retorno'
   }
 
-  // 🔹 REMESSA / TRANSFERÊNCIA
+  // 🔹 REMESSA (PRIORIDADE ALTA)
   if (
     n.includes('remessa') ||
     n.includes('transferencia')
@@ -46,8 +36,19 @@ function mapTipoNotaFromNatOp(natOp: string): string {
     return 'remessa'
   }
 
-  return n
+  // 🔹 VENDA / FATURAMENTO (POR ÚLTIMO)
+  if (
+    n.includes('venda') ||
+    n.includes('comercializacao') ||
+    n.includes('faturamento') ||
+    n.includes('saida')
+  ) {
+    return 'venda'
+  }
+
+  return 'outros'
 }
+
 
 function getNotaStatus(xml: any): { status: string; motivo: string } {
   const prot =

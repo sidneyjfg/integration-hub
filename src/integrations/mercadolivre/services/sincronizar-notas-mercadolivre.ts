@@ -49,7 +49,8 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
           await buscarNotasMercadoLivre({
             clienteId,
             accessToken,
-            refreshToken
+            refreshToken,
+            sftpMode: false
           })
         const chavesCliente = notas.map(n => n.chave)
 
