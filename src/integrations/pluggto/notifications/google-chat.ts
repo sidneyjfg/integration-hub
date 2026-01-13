@@ -43,3 +43,16 @@ export async function notifyGoogleChat(message: string | object): Promise<void> 
   }
 }
 
+export function formatarLinhaPedido(p: {
+  ordnoweb: string
+  status: string
+  date: string
+  channel?: string | null
+}) {
+  return (
+    `• Pedido: ${p.ordnoweb}\n` +
+    `  Status: ${p.status}\n` +
+    `  Data: ${p.date}\n` +
+    `  Canal: ${p.channel ?? '—'}`
+  )
+}

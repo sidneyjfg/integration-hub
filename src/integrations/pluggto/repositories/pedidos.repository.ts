@@ -128,6 +128,7 @@ export async function buscarPedidosNaoIntegrados():
     status: string
     date: string
     total_paid: number | null
+    channel: string | null
   }[]> {
 
   console.log('[PLUGGTO][SYNC][DB] Buscando pedidos não integrados')
@@ -137,14 +138,15 @@ export async function buscarPedidosNaoIntegrados():
     t.ordnoweb,
     t.status,
     DATE_FORMAT(t.date, '%d/%m/%Y %H:%i:%s') AS date,
-    t.total_paid
+    t.total_paid,
+    t.channel
   FROM ${coreConfig.DB_NAME_MONITORAMENTO}.temp_orders t
   LEFT JOIN ${coreConfig.DB_NAME_DADOS}.eordchannelp e
     ON t.ordnoweb = e.ordnoweb
    AND e.storeno IN (${coreConfig.STORENOS
-     .split(',')
-     .map(s => `'${s.trim()}'`)
-     .join(',')})
+      .split(',')
+      .map(s => `'${s.trim()}'`)
+      .join(',')})
   WHERE e.ordnoweb IS NULL
   ORDER BY t.date DESC
 `
@@ -156,7 +158,9 @@ export async function buscarPedidosNaoIntegrados():
     status: string
     date: string
     total_paid: number | null
+    channel: string | null
   }[]
+
 
   console.log('[PLUGGTO][SYNC][DB] Consulta finalizada', {
     naoIntegrados: result.length

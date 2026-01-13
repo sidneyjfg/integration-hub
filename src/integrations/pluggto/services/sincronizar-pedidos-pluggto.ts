@@ -5,7 +5,7 @@ import {
     salvarPedidosTempPluggto
 } from '../repositories/pedidos.repository'
 import { pluggtoConfig } from '../env.schema'
-import { notifyGoogleChat } from '../notifications/google-chat'
+import { formatarLinhaPedido, notifyGoogleChat } from '../notifications/google-chat'
 
 export async function sincronizarPedidosPluggto() {
     console.log('[PLUGGTO][SYNC] Iniciando pedidos')
@@ -32,13 +32,7 @@ export async function sincronizarPedidosPluggto() {
     if (!pluggtoConfig.NERUS_RECEIVE_ORDER_URL) {
         console.warn('[PLUGGTO][SYNC] Reenvio desativado — NERUS_RECEIVE_ORDER_URL ausente')
 
-        const linhas = naoIntegrados.map(p =>
-            `• Pedido: ${p.ordnoweb}\n` +
-            `  Status: ${p.status}\n` +
-            `  Data: ${p.date}\n` +
-            `  Valor: R$ ${p.total_paid?.toFixed(2) ?? '—'}`
-        )
-
+        const linhas = naoIntegrados.map(formatarLinhaPedido)
 
         await notifyGoogleChat(
             [
@@ -57,11 +51,14 @@ export async function sincronizarPedidosPluggto() {
     // 🔁 Reenvio normal
     // =========================
     const erros: Array<{ ordnoweb: string; error: string }> = []
+    const reenviados: typeof naoIntegrados = []
 
     for (const pedido of naoIntegrados) {
         try {
             console.log(`[PLUGGTO][REENVIO] Reenviando pedido ${pedido.ordnoweb}`)
             await reenviarPedidoPluggto(pedido.ordnoweb)
+
+            reenviados.push(pedido) // 👈 sucesso
         } catch (err: any) {
             const msg = err?.message || String(err)
             console.error(
@@ -72,14 +69,41 @@ export async function sincronizarPedidosPluggto() {
         }
     }
 
-    if (erros.length) {
-        await notifyGoogleChat(
-            [
-                '❌ *Falha ao reenviar pedidos Pluggto*',
-                '',
-                `<pre>${JSON.stringify(erros, null, 2)}</pre>`
-            ].join('\n')
+    const mensagens: string[] = []
+
+    if (naoIntegrados.length) {
+        mensagens.push(
+            '⚠️ *Pedidos Pluggto não integrados*',
+            '',
+            `Total: ${naoIntegrados.length}`,
+            '',
+            ...naoIntegrados.map(formatarLinhaPedido),
+            ''
         )
     }
+
+    if (reenviados.length) {
+        mensagens.push(
+            '🔁 *Pedidos reenviados com sucesso*',
+            '',
+            `Total: ${reenviados.length}`,
+            '',
+            ...reenviados.map(formatarLinhaPedido),
+            ''
+        )
+    }
+
+    if (erros.length) {
+        mensagens.push(
+            '❌ *Falha ao reenviar pedidos*',
+            '',
+            `<pre>${JSON.stringify(erros, null, 2)}</pre>`
+        )
+    }
+
+    if (mensagens.length) {
+        await notifyGoogleChat(mensagens.join('\n'))
+    }
+
 }
 
