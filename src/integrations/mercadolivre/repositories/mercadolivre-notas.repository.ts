@@ -358,8 +358,8 @@ export async function buscarCredenciaisMercadoLivre(): Promise<MercadoLivreCrede
       END AS clientId
 
     FROM ${coreConfig.DB_NAME_DADOS}.userfull u
-    WHERE u.access_token IS NOT NULL
-      AND u.refresh_token IS NOT NULL
+    WHERE u.accessToken IS NOT NULL
+      AND u.refreshToken IS NOT NULL
   `
 
   const [rows] = await poolMain.query(sql)
