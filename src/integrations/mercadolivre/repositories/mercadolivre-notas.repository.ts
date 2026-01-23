@@ -4,6 +4,14 @@ import { mercadolivreConfig } from '../env.schema'
 import { MercadoLivreNotaBody } from '../../../shared/types/mercadolivre'
 import { isSerieIgnorada } from '../utils'
 
+export type MercadoLivreCredential = {
+  clienteId: string            // user_id
+  clientId: string             // Mercado Livre OAuth client_id real
+  clientSecret: string
+  accessToken: string
+  refreshToken: string
+}
+
 /**
  * 🔍 Verifica se a nota já existe no Nérus (nfeavxml)
  */
@@ -333,4 +341,28 @@ export async function zerarRetryCountFfpreprocnf(params: {
   ])
 
   return (res as any).affectedRows ?? 0
+}
+
+export async function buscarCredenciaisMercadoLivre(): Promise<MercadoLivreCredential[]> {
+  const sql = `
+    SELECT
+      u.user_id AS clienteId,
+      u.client_secret AS clientSecret,
+      u.access_token AS accessToken,
+      u.refresh_token AS refreshToken,
+
+      CASE u.client_secret
+        WHEN 'gcqTSgpZcUSeFuvS9EjM5EwO83DzZWwN' THEN '7728772652676163'
+        WHEN '3WNCDQ6jJOJJfcGVpZtb4YyyVhewL4Ai' THEN '3190113795567312'
+        ELSE NULL
+      END AS clientId
+
+    FROM ${coreConfig.DB_NAME_DADOS}.userfull u
+    WHERE u.access_token IS NOT NULL
+      AND u.refresh_token IS NOT NULL
+  `
+
+  const [rows] = await poolMain.query(sql)
+
+  return rows as MercadoLivreCredential[]
 }

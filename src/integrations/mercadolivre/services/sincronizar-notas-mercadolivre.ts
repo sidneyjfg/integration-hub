@@ -2,7 +2,8 @@ import {
   salvarNotasTmpMercadoLivre,
   // buscarNotasNaoIntegradasNerus,
   buscarNotasNaoIntegradasNerusPorChaves,
-  verificarECriarTabelaTmpNotas
+  verificarECriarTabelaTmpNotas,
+  buscarCredenciaisMercadoLivre
 } from '../repositories/mercadolivre-notas.repository'
 import { notifyGoogleChat } from '../notifications/google-chat'
 import { buscarNotasMercadoLivre } from '../api/buscar-notas-mercadolivre'
@@ -17,41 +18,33 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
     await verificarECriarTabelaTmpNotas()
     console.log('[MERCADOLIVRE][SYNC] Tabela tmp_notas OK')
 
-    const clienteIds =
-      mercadolivreConfig.MERCADOLIVRE_CLIENTE_ID.split(',').map(s => s.trim())
+    const contas = await buscarCredenciaisMercadoLivre()
 
-    const accessTokens =
-      mercadolivreConfig.MERCADOLIVRE_ACCESS_TOKEN.split(',').map(s => s.trim())
-
-    const refreshTokens =
-      mercadolivreConfig.MERCADOLIVRE_REFRESH_TOKEN.split(',').map(s => s.trim())
-
-    if (
-      clienteIds.length !== accessTokens.length ||
-      clienteIds.length !== refreshTokens.length
-    ) {
-      throw new Error(
-        '[MERCADOLIVRE][CONFIG] CLIENTE_ID, ACCESS_TOKEN e REFRESH_TOKEN com tamanhos diferentes'
-      )
+    if (!contas.length) {
+      throw new Error('[MERCADOLIVRE] Nenhuma credencial válida encontrada no banco')
     }
 
-    for (let i = 0; i < clienteIds.length; i++) {
-      const clienteId = clienteIds[i]
-      const accessToken = accessTokens[i]
-      const refreshToken = refreshTokens[i]
+
+    for (const conta of contas) {
+      const clienteId = conta.clienteId
+      const accessToken = conta.accessToken
+      const refreshToken = conta.refreshToken
+      const clientId = conta.clientId
+      const clientSecret = conta.clientSecret   // ✅ AQUI
 
       console.log('\n==============================')
       console.log('[MERCADOLIVRE][SYNC] Iniciando cliente', { clienteId })
       console.log('==============================')
 
       try {
-        const { notas } =
-          await buscarNotasMercadoLivre({
-            clienteId,
-            accessToken,
-            refreshToken,
-            sftpMode: false
-          })
+        const { notas } = await buscarNotasMercadoLivre({
+          clienteId,
+          clientId,
+          clientSecret,
+          accessToken,
+          refreshToken,
+          sftpMode: false
+        })
         const chavesCliente = notas.map(n => n.chave)
 
         console.log('[MERCADOLIVRE][SYNC][BUSCA FINALIZADA]', {

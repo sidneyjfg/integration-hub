@@ -15,11 +15,14 @@ import { refreshAccessToken } from './auth'
 
 type BuscarNotasParams = {
   clienteId: string
+  clientId: string
+  clientSecret: string
   accessToken: string
   refreshToken: string
   endOverride?: number
   sftpMode?: boolean
 }
+
 type BuscarNotasResult = {
   notas: MercadoLivreNotaBody[]
   startDate: string
@@ -36,10 +39,13 @@ export async function buscarNotasMercadoLivre(
 
   const {
     clienteId,
+    clientId,
+    clientSecret,
     accessToken,
     refreshToken,
     sftpMode = false
   } = params
+
 
   console.log('[MERCADOLIVRE][BUSCA] Iniciando busca', {
     clienteId,
@@ -201,8 +207,8 @@ export async function buscarNotasMercadoLivre(
       })
 
       const newAccessToken = await refreshAccessToken({
-        clientId: mercadolivreConfig.MERCADOLIVRE_CLIENT_ID,
-        clientSecret: mercadolivreConfig.MERCADOLIVRE_CLIENT_SECRET,
+        clientId,
+        clientSecret,
         refreshToken,
         clienteId
       })
