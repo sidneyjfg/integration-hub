@@ -13,6 +13,7 @@ import { executarSftpSimples } from '../sftp/modos/sftp-simples'
 import { executarSftpLedger } from '../sftp/modos/sftp-ledger'
 import { executarSftpVonder } from '../sftp/modos/sftp-vonder'
 import { ResultadoEnvio } from '../../../shared/types'
+import { buscarCredenciaisMercadoLivre } from '../repositories/mercadolivre-notas.repository'
 
 function classificarArquivoVonder(file: string): 'IN' | 'CTE' | 'IN_EVENTOS' {
   const nome = file.toLowerCase()
@@ -42,28 +43,20 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
   const isVonder = modo === 'SFTP_VONDER_LEDGER'
   const isSftpMode = modo.startsWith('SFTP')
 
-  const clienteIds =
-    mercadolivreConfig.MERCADOLIVRE_CLIENTE_ID.split(',').map(s => s.trim())
+  const contas = await buscarCredenciaisMercadoLivre()
 
-  const accessTokens =
-    mercadolivreConfig.MERCADOLIVRE_ACCESS_TOKEN.split(',').map(s => s.trim())
-
-  const refreshTokens =
-    mercadolivreConfig.MERCADOLIVRE_REFRESH_TOKEN.split(',').map(s => s.trim())
-
-  if (
-    clienteIds.length !== accessTokens.length ||
-    clienteIds.length !== refreshTokens.length
-  ) {
-    throw new Error(
-      '[MERCADOLIVRE][SFTP] CLIENTE_ID, ACCESS_TOKEN e REFRESH_TOKEN desalinhados'
-    )
+  if (!contas.length) {
+    throw new Error('[MERCADOLIVRE][SFTP] Nenhuma credencial válida encontrada no banco')
   }
 
-  for (let i = 0; i < clienteIds.length; i++) {
-    const clienteId = clienteIds[i]
-    const accessToken = accessTokens[i]
-    const refreshToken = refreshTokens[i]
+
+  for (const conta of contas) {
+    const clienteId = conta.clienteId
+    const accessToken = conta.accessToken
+    const refreshToken = conta.refreshToken
+    const clientId = conta.clientId
+    const clientSecret = conta.clientSecret
+
 
     console.log('[MERCADOLIVRE][SFTP] Processando cliente', { clienteId })
 
@@ -71,6 +64,8 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
       const { notas, startDate, endDate } =
         await buscarNotasMercadoLivre({
           clienteId,
+          clientId,
+          clientSecret,
           accessToken,
           refreshToken,
           endOverride: mercadolivreConfig.MERCADOLIVRE_END_SFTP,

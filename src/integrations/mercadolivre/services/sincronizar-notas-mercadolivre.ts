@@ -30,7 +30,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
       const accessToken = conta.accessToken
       const refreshToken = conta.refreshToken
       const clientId = conta.clientId
-      const clientSecret = conta.clientSecret   // ✅ AQUI
+      const clientSecret = conta.clientSecret
 
       console.log('\n==============================')
       console.log('[MERCADOLIVRE][SYNC] Iniciando cliente', { clienteId })
