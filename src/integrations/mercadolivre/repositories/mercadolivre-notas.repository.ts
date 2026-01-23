@@ -346,12 +346,12 @@ export async function zerarRetryCountFfpreprocnf(params: {
 export async function buscarCredenciaisMercadoLivre(): Promise<MercadoLivreCredential[]> {
   const sql = `
     SELECT
-      u.user_id AS clienteId,
-      u.client_secret AS clientSecret,
-      u.access_token AS accessToken,
-      u.refresh_token AS refreshToken,
+      u.userId AS clienteId,
+      u.clientSecret AS clientSecret,
+      u.accessToken AS accessToken,
+      u.refreshToken AS refreshToken,
 
-      CASE u.client_secret
+      CASE u.clientSecret
         WHEN 'gcqTSgpZcUSeFuvS9EjM5EwO83DzZWwN' THEN '7728772652676163'
         WHEN '3WNCDQ6jJOJJfcGVpZtb4YyyVhewL4Ai' THEN '3190113795567312'
         ELSE NULL
