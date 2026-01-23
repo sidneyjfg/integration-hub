@@ -12,15 +12,7 @@ const toBool = (v: unknown) => {
 
 export const mercadolivreEnvSchema = z.object({
     CLIENT_NAME: z.string().optional(),
-    // 🔐 Credenciais Mercado Livre
-    MERCADOLIVRE_CLIENT_ID: z.string().min(1),
-    MERCADOLIVRE_CLIENT_SECRET: z.string().min(1),
-    MERCADOLIVRE_ACCESS_TOKEN: z.string().min(1),
-    MERCADOLIVRE_REFRESH_TOKEN: z.string().min(1),
-
-    // 🧾 Conta Mercado Livre
-    MERCADOLIVRE_CLIENTE_ID: z.string().min(1),
-
+    
     // SFTP Data
     MERCADOLIVRE_SFTP_HOST: z.string().optional(),
     MERCADOLIVRE_SFTP_PORT: z.string().optional(),
