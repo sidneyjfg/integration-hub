@@ -38,24 +38,24 @@ export async function salvarProdutosTempTraycorp(
       if (!estoque) continue;
 
       await poolMonitoramento.execute(sql, [
-        produto.produtoVarianteId,
-        produto.produtoId,
+        produto.produtoVarianteId ?? null,
+        produto.produtoId ?? null,
         produto.idPaiExterno ?? null,
-        produto.sku,
-        produto.nome,
+        produto.sku ?? null,
+        produto.nome ?? null,
         produto.nomeProdutoPai ?? null,
         produto.precoCusto ?? null,
         produto.precoDe ?? null,
         produto.precoPor ?? null,
         produto.ean ?? null,
-        estoque.centroDistribuicaoId,
-        estoque.estoqueFisico,
-        estoque.estoqueReservado,
-        estoque.alertaEstoque,
+        estoque.centroDistribuicaoId ?? null,
+        estoque.estoqueFisico ?? null,
+        estoque.estoqueReservado ?? null,
+        estoque.alertaEstoque ?? null,
         produto.dataCriacao ?? null,
         produto.dataAtualizacao ?? null,
         produto.parentId ?? null,
-        JSON.stringify(produto.raw_payload),
+        JSON.stringify(produto.raw_payload ?? produto),
       ]);
     }
 
