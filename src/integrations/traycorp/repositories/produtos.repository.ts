@@ -35,33 +35,26 @@ export async function salvarProdutosTempTraycorp(
   try {
     for (const produto of produtos) {
       const estoque = produto.estoque?.[0];
-
-      if (!estoque) {
-        console.warn(
-          "[TRAYCORP][DB] Produto sem estoque, ignorado",
-          produto.produtoVarianteId
-        );
-        continue;
-      }
+      if (!estoque) continue;
 
       await poolMonitoramento.execute(sql, [
         produto.produtoVarianteId,
         produto.produtoId,
-        produto.idPaiExterno,
+        produto.idPaiExterno ?? null,
         produto.sku,
         produto.nome,
-        produto.nomeProdutoPai,
-        produto.precoCusto,
-        produto.precoDe,
-        produto.precoPor,
-        produto.ean,
+        produto.nomeProdutoPai ?? null,
+        produto.precoCusto ?? null,
+        produto.precoDe ?? null,
+        produto.precoPor ?? null,
+        produto.ean ?? null,
         estoque.centroDistribuicaoId,
         estoque.estoqueFisico,
         estoque.estoqueReservado,
         estoque.alertaEstoque,
-        produto.dataCriacao,
-        produto.dataAtualizacao,
-        produto.parentId,
+        produto.dataCriacao ?? null,
+        produto.dataAtualizacao ?? null,
+        produto.parentId ?? null,
         JSON.stringify(produto.raw_payload),
       ]);
     }
