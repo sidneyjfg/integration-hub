@@ -37,6 +37,28 @@ export async function salvarProdutosTempTraycorp(
       const estoque = produto.estoque?.[0];
       if (!estoque) continue;
 
+      const debugObj = {
+        produtoVarianteId: produto.produtoVarianteId ?? null,
+        produtoId: produto.produtoId ?? null,
+        idPaiExterno: produto.idPaiExterno ?? null,
+        sku: produto.sku ?? null,
+        nome: produto.nome ?? null,
+        nomeProdutoPai: produto.nomeProdutoPai ?? null,
+        precoCusto: produto.precoCusto ?? null,
+        precoDe: produto.precoDe ?? null,
+        precoPor: produto.precoPor ?? null,
+        ean: produto.ean ?? null,
+        centroDistribuicaoId: estoque.centroDistribuicaoId ?? null,
+        estoqueFisico: estoque.estoqueFisico ?? null,
+        estoqueReservado: estoque.estoqueReservado ?? null,
+        alertaEstoque: estoque.alertaEstoque ?? null,
+        dataCriacao: produto.dataCriacao ?? null,
+        dataAtualizacao: produto.dataAtualizacao ?? null,
+        parentId: produto.parentId ?? null,
+      };
+
+      console.log("[TRAYCORP][DB][INSERT]", debugObj);
+
       await poolMonitoramento.execute(sql, [
         produto.produtoVarianteId ?? null,
         produto.produtoId ?? null,
