@@ -32,6 +32,12 @@ export default async function filtrarPorTipoNota(
 
       const tipo = String(natOp).toUpperCase()
 
+      // 🚨 EXCEÇÃO: "Retorno de mercadoria não entregue" é devolução
+      if (tipo.includes('RETORNO DE MERCADORIA NAO ENTREGUE')) {
+        result.push(file)
+        continue
+      }
+
       if (ignores.some(ignore => tipo.includes(ignore))) {
         continue
       }
