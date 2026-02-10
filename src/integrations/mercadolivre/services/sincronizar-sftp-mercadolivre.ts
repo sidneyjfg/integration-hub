@@ -194,7 +194,7 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
       })
 
       await notifyGoogleChat(
-        `❌ Erro no SFTP Mercado Livre • Cliente ${clienteId}`
+        `❌ Erro no SFTP Mercado Livre • Cliente ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}`
       )
     }
   }

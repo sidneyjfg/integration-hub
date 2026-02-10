@@ -55,7 +55,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
         if (notas.length === 0) {
           console.log('[MERCADOLIVRE][SYNC] Nenhuma nota encontrada', { clienteId })
           await notifyGoogleChat(
-            `⚠️ Nenhuma nota fulfillment encontrada para a conta ${clienteId}.`
+            `⚠️ Nenhuma nota fulfillment encontrada para a cliente: ${mercadolivreConfig.CLIENT_NAME} - ${clienteId}.`
           )
           continue
         }
@@ -88,7 +88,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
 
           // 🔔 resumo
           await notifyGoogleChat(
-            `⚠️ ${notasNaoIntegradas.length} notas do Mercado Livre não integradas no Nérus (Conta ${clienteId}).`
+            `⚠️ ${notasNaoIntegradas.length} notas do Mercado Livre não integradas no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}).`
           )
 
           // 📋 cards por nota
@@ -101,7 +101,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
         }
         else {
           await notifyGoogleChat(
-            `✅ Todas as notas do Mercado Livre foram integradas no Nérus (Conta ${clienteId}).`
+            `✅ Todas as notas do Mercado Livre foram integradas no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}).`
           )
         }
 
@@ -116,7 +116,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
         })
 
         await notifyGoogleChat(
-          `❌ Erro ao processar notas do Mercado Livre para a conta ${clienteId}.`
+          `❌ Erro ao processar notas do Mercado Livre para o cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}.`
         )
       }
     }
