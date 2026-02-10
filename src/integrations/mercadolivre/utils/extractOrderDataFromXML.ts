@@ -15,10 +15,16 @@ function mapTipoNotaFromNatOp(natOp: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
 
+  // 🔥 INSUCESSO — regra explícita
+  if (n.includes('retorno de mercadoria nao entregue')) {
+    return 'insucesso'
+  }
+
   // 🔹 DEVOLUÇÃO
-  if (n.includes('devolucao') || n.includes('insucesso')) {
+  if (n.includes('devolucao')) {
     return 'devolucao'
   }
+
 
   // 🔹 RETORNO (PRIORIDADE ALTA)
   if (
