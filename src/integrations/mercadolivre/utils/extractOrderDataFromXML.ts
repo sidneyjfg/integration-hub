@@ -4,10 +4,13 @@ import { MercadoLivreNotaBody } from '../../../shared/types'
 
 function formatEmissao(emissaoISO?: string): string | null {
   if (!emissaoISO) return null
+
   const parsed = parseISO(emissaoISO)
   const adjusted = addHours(parsed, 3)
-  return format(adjusted, 'dd/MM/yyyy HH:mm:ss')
+
+  return format(adjusted, 'yyyyMMdd')
 }
+
 
 function mapTipoNotaFromNatOp(natOp: string): string {
   const n = natOp

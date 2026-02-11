@@ -78,8 +78,24 @@ export async function salvarNotasTmpMercadoLivre(
        emissao, valor, valor_total, frete,
        observacao, data_nfe_ref, chave_nfe_ref)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE
+      status = VALUES(status),
+      venda_remesa = VALUES(venda_remesa),
+      NFe = VALUES(NFe),
+      serie = VALUES(serie),
+      nome = VALUES(nome),
+      modalidade = VALUES(modalidade),
+      operacao = VALUES(operacao),
+      tipo_logistico = VALUES(tipo_logistico),
+      emissao = VALUES(emissao),
+      valor = VALUES(valor),
+      valor_total = VALUES(valor_total),
+      frete = VALUES(frete),
+      observacao = VALUES(observacao),
+      data_nfe_ref = VALUES(data_nfe_ref),
+      chave_nfe_ref = VALUES(chave_nfe_ref)
   `
-
+  let atualizadas = 0
   for (const nota of notas) {
     try {
       console.log('[MERCADOLIVRE][DB] Processando nota', {
@@ -100,12 +116,37 @@ export async function salvarNotasTmpMercadoLivre(
         continue
       }
 
-      if (await checkNotaTemporariaExistente(nota.chave)) {
-        jaExistiam++
-        console.log('[MERCADOLIVRE][DB] Já existia na tmp_notas', nota.chave)
-        inseridas.push(nota)
-        continue
+      const [res] = await poolMonitoramento.execute(sql, [
+        nota.status ?? null,
+        nota.venda_remessa ?? null,
+        nota.NFe ?? null,
+        nota.serie ?? null,
+        nota.nome ?? null,
+        nota.chave,
+        nota.modalidade ?? null,
+        nota.operacao ?? null,
+        nota.tipo_logistico ?? null,
+        nota.emissao ?? null,
+        nota.valor ?? null,
+        nota.valor_total ?? null,
+        nota.frete ?? null,
+        nota.observacao ?? null,
+        nota.data_nfe_ref ?? null,
+        nota.chave_nfe_ref ?? null
+      ])
+
+      const result = res as any
+
+      if (result.affectedRows === 1) {
+        inseridasNovas++
+        console.log('[MERCADOLIVRE][DB] Inserida nova nota', nota.chave)
+      } else if (result.affectedRows === 2) {
+        atualizadas++
+        console.log('[MERCADOLIVRE][DB] Nota atualizada', nota.chave)
       }
+
+      inseridas.push(nota)
+
 
       await poolMonitoramento.execute(sql, [
         nota.status ?? null,
@@ -144,11 +185,12 @@ export async function salvarNotasTmpMercadoLivre(
   console.log('[MERCADOLIVRE][DB][RESUMO]', {
     totalRecebidas: notas.length,
     inseridasNovas,
-    jaExistiam,
+    atualizadas,
     ignoradasSerie,
     ignoradasTipo,
     erros
   })
+
 
   return inseridas
 }
