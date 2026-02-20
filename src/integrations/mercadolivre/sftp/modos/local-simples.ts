@@ -2,9 +2,12 @@ import { mercadolivreConfig } from '../../env.schema'
 import { filtrarPorIgnoreEndFile, filtrarPorTipoNota, moveFilesLocal } from '../../utils'
 
 
+import path from 'path'
+import { ResultadoEnvio } from '../../../../shared/types'
+
 export async function executarLocalSimples(
   files: string[]
-): Promise<void> {
+): Promise<ResultadoEnvio> {
 
   const {
     MERCADOLIVRE_SFTP_DIR,
@@ -22,7 +25,15 @@ export async function executarLocalSimples(
     MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA
   )
 
-  if (!filtrados.length) return
+  if (!filtrados.length) {
+    return { arquivos: [], total: 0 }
+  }
 
   await moveFilesLocal(filtrados, MERCADOLIVRE_SFTP_DIR)
+
+  return {
+    arquivos: filtrados.map(f => path.basename(f)),
+    total: filtrados.length
+  }
 }
+

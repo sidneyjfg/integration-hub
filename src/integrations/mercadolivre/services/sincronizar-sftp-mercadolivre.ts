@@ -109,7 +109,7 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
 
       switch (modo) {
         case 'LOCAL_SIMPLES':
-          await executarLocalSimples(files)
+          resultadoEnvio = await executarLocalSimples(files)
           break
 
         case 'LOCAL_LEDGER':
