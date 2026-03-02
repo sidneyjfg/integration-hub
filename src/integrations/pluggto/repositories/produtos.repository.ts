@@ -1,4 +1,5 @@
 // repositories/produtos.repository.ts
+import { ResultSetHeader } from 'mysql2'
 import { poolMonitoramento } from '../../../core/db'
 import { coreConfig } from '../../../core/env.schema'
 import { PluggtoProductBody } from '../../../shared/types'
@@ -17,7 +18,7 @@ export async function salvarProdutosTempPluggto(produtos: PluggtoProductBody[]) 
   `
 
   for (const p of produtos) {
-    await poolMonitoramento.execute(sql, [
+    await poolMonitoramento.execute<ResultSetHeader>(sql, [
       p.idNerus,
       p.idPluggto,
       p.ean,
