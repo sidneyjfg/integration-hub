@@ -24,3 +24,33 @@ export interface ResultadoComparacaoPedido {
 export type ContextoLogSincronizacaoPedidos =
   | { totalPedidos: number }
   | { erro: unknown }
+
+// Product Types
+export interface AnymarketProductSku {
+  id: number
+  title: string
+  partnerId: string
+  ean?: string
+  price?: number
+  amount?: number
+  stockLocalId?: number
+}
+
+export interface AnymarketProduct {
+  id: number
+  title: string
+  isProductActive: boolean
+  skus: AnymarketProductSku[]
+}
+
+export interface AnymarketProductsResponse {
+  content: AnymarketProduct[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
+export type ContextoLogSincronizacaoProdutos =
+  | { totalProdutos: number }
+  | { erro: unknown }
