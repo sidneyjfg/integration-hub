@@ -49,6 +49,10 @@ export interface AnymarketProductsResponse {
   size: number
   totalElements: number
   totalPages: number
+  links: {
+    rel: string
+    href: string
+  }[]
 }
 
 export type ContextoLogSincronizacaoProdutos =
