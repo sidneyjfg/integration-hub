@@ -19,7 +19,7 @@ export async function buscarProdutosAnymarket(
     offset: offset.toString()
   })
 
-  const url = `${anymarketConfig.ANYMARKET_URL}/products?${queryParams.toString()}`
+  const url = `${anymarketConfig.ANYMARKET_URL}/v2/products?${queryParams.toString()}`
 
   const response = await fetch(url, {
     method: 'GET',
