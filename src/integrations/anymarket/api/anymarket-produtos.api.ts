@@ -12,16 +12,12 @@ export interface BuscarProdutosParams {
 export async function buscarProdutosAnymarket(
   params: BuscarProdutosParams = {}
 ): Promise<AnymarketProductsResponse> {
-  const { limit = 100, offset = 0, categoryId, externalId, sku } = params
+  const { limit = 100, offset = 0 } = params
 
   const queryParams = new URLSearchParams({
     limit: limit.toString(),
     offset: offset.toString()
   })
-
-  if (categoryId) queryParams.append('categoryId', categoryId)
-  if (externalId) queryParams.append('externalId', externalId)
-  if (sku) queryParams.append('sku', sku)
 
   const url = `${anymarketConfig.ANYMARKET_URL}/products?${queryParams.toString()}`
 
