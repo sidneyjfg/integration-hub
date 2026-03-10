@@ -79,21 +79,26 @@ export async function salvarNotasTmpMercadoLivre(
         observacao, data_nfe_ref, chave_nfe_ref)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
-        status = VALUES(status),
-        venda_remesa = VALUES(venda_remesa),
-        NFe = VALUES(NFe),
-        serie = VALUES(serie),
-        nome = VALUES(nome),
-        modalidade = VALUES(modalidade),
-        operacao = VALUES(operacao),
-        tipo_logistico = VALUES(tipo_logistico),
-        emissao = VALUES(emissao),
-        valor = VALUES(valor),
-        valor_total = VALUES(valor_total),
-        frete = VALUES(frete),
-        observacao = VALUES(observacao),
-        data_nfe_ref = VALUES(data_nfe_ref),
-        chave_nfe_ref = VALUES(chave_nfe_ref)
+status =
+CASE
+  WHEN VALUES(status) = 'Cancelada' THEN 'Cancelada'
+  WHEN VALUES(status) = 'Inutilizada' THEN 'Inutilizada'
+  ELSE status
+END,
+  venda_remesa = COALESCE(VALUES(venda_remesa), venda_remesa),
+  NFe = COALESCE(VALUES(NFe), NFe),
+  serie = COALESCE(VALUES(serie), serie),
+  nome = COALESCE(VALUES(nome), nome),
+  modalidade = COALESCE(VALUES(modalidade), modalidade),
+  operacao = COALESCE(VALUES(operacao), operacao),
+  tipo_logistico = COALESCE(VALUES(tipo_logistico), tipo_logistico),
+  emissao = COALESCE(VALUES(emissao), emissao),
+  valor = COALESCE(VALUES(valor), valor),
+  valor_total = COALESCE(VALUES(valor_total), valor_total),
+  frete = COALESCE(VALUES(frete), frete),
+  observacao = COALESCE(VALUES(observacao), observacao),
+  data_nfe_ref = COALESCE(VALUES(data_nfe_ref), data_nfe_ref),
+  chave_nfe_ref = COALESCE(VALUES(chave_nfe_ref), chave_nfe_ref)
     `
   let atualizadas = 0
   for (const nota of notas) {
