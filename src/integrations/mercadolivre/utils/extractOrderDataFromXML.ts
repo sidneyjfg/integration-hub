@@ -88,19 +88,63 @@ export default function extractOrderDataFromXML(
   xml: any,
   fileName: string
 ): MercadoLivreNotaBody[] {
+
   console.log(`[EXTRACT] Processando ${fileName}`)
 
+  // 🟡 1️⃣ VERIFICA SE É EVENTO (cancelamento / inutilização)
+  const evento = xml?.procEventoNFe?.evento?.[0]?.infEvento?.[0]
+
+  if (evento) {
+
+    const chave = evento.chNFe?.[0]
+    const tpEvento = evento.tpEvento?.[0]
+
+    let status = 'Evento'
+
+    if (tpEvento === '110111' || tpEvento === '110112') {
+      status = 'Cancelada'
+    }
+
+    if (tpEvento === '110102') {
+      status = 'Inutilizada'
+    }
+
+    if (tpEvento === '110111' || tpEvento === '110112') {
+      console.log('[EVENTO NFE]', {
+        chave,
+        tpEvento,
+        status
+      })
+    }
+
+    return [
+      {
+        chave,
+        status,
+        tipoNota: 'evento',
+        filePath: fileName
+      } as MercadoLivreNotaBody
+    ]
+  }
+
+  // 🔵 2️⃣ XML NORMAL DA NOTA
   const infNFe = xml?.nfeProc?.NFe?.[0]?.infNFe?.[0]
-  if (!infNFe) return []
+
+  if (!infNFe) {
+    console.warn('[XML IGNORADO]', fileName)
+    return []
+  }
 
   const chave =
     infNFe.$?.Id ? extractChaveFromId(infNFe.$.Id) : 'Desconhecido'
 
   const status = getNotaStatus(xml).status
-  const vendaRemessa = infNFe['det']?.[0]?.['infAdProd']?.[0]?.match(/\d+/)?.[0] || 'Desconhecido';
+  const vendaRemessa = infNFe['det']?.[0]?.['infAdProd']?.[0]?.match(/\d+/)?.[0] || 'Desconhecido'
+
   const nfeNumero = infNFe.ide?.[0]?.nNF?.[0]
   const serie = infNFe.ide?.[0]?.serie?.[0]
   const nome = infNFe.dest?.[0]?.xNome?.[0]
+
   const emissao = formatEmissao(infNFe.ide?.[0]?.dhEmi?.[0])
   const valor = infNFe.total?.[0]?.ICMSTot?.[0]?.vProd?.[0]
   const valorTotal = infNFe.total?.[0]?.ICMSTot?.[0]?.vNF?.[0]
@@ -113,7 +157,9 @@ export default function extractOrderDataFromXML(
       : 'Desconhecido'
 
   const natOp = infNFe.ide?.[0]?.natOp?.[0] ?? ''
+
   const tipoNota = mapTipoNotaFromNatOp(natOp)
+
   if (tipoNota === 'outros') {
     console.warn('[OUTROS]', {
       file: fileName,
@@ -145,8 +191,6 @@ export default function extractOrderDataFromXML(
       valor_total: valorTotal,
       frete,
       tipo_logistico: tipoLogistico,
-
-      // 🔑 NOVO
       tipoNota,
       filePath: fileName
     }

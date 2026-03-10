@@ -111,6 +111,18 @@ export async function buscarNotasMercadoLivre(
       totalArquivos: extractedFiles.length
     })
 
+    // 🔧 ordenar para processar EVENTOS por último
+    extractedFiles.sort((a, b) => {
+
+      const aEvento = a.includes('procEventoNFe')
+      const bEvento = b.includes('procEventoNFe')
+
+      if (aEvento && !bEvento) return 1
+      if (!aEvento && bEvento) return -1
+
+      return 0
+    })
+
     const notas: MercadoLivreNotaBody[] = []
     let totalXmlProcessados = 0
     let totalXmlIgnorados = 0
