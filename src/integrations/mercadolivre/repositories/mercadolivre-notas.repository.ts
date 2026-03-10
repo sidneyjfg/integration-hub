@@ -24,12 +24,12 @@ export async function checkNotaExistente(
     .join(',')
 
   const sql = `
-    SELECT 1
-      FROM ${coreConfig.DB_NAME_DADOS}.nfeavxml
-     WHERE nfkey = ?
-       AND storeno IN (${storenos})
-     LIMIT 1
-  `
+      SELECT 1
+        FROM ${coreConfig.DB_NAME_DADOS}.nfeavxml
+      WHERE nfkey = ?
+        AND storeno IN (${storenos})
+      LIMIT 1
+    `
 
   const [rows] = await poolMain.query(sql, [chaveNfe])
   return (rows as any[]).length > 0
@@ -42,11 +42,11 @@ async function checkNotaTemporariaExistente(
   chaveNfe: string
 ): Promise<boolean> {
   const sql = `
-    SELECT 1
-      FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
-     WHERE chave = ?
-     LIMIT 1
-  `
+      SELECT 1
+        FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
+      WHERE chave = ?
+      LIMIT 1
+    `
   const [rows] = await poolMonitoramento.query(sql, [chaveNfe])
   return (rows as any[]).length > 0
 }
@@ -72,47 +72,40 @@ export async function salvarNotasTmpMercadoLivre(
   }
 
   const sql = `
-    INSERT INTO ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
-      (status, venda_remesa, NFe, serie, nome, chave,
-       modalidade, operacao, tipo_logistico,
-       emissao, valor, valor_total, frete,
-       observacao, data_nfe_ref, chave_nfe_ref)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ON DUPLICATE KEY UPDATE
-      status = VALUES(status),
-      venda_remesa = VALUES(venda_remesa),
-      NFe = VALUES(NFe),
-      serie = VALUES(serie),
-      nome = VALUES(nome),
-      modalidade = VALUES(modalidade),
-      operacao = VALUES(operacao),
-      tipo_logistico = VALUES(tipo_logistico),
-      emissao = VALUES(emissao),
-      valor = VALUES(valor),
-      valor_total = VALUES(valor_total),
-      frete = VALUES(frete),
-      observacao = VALUES(observacao),
-      data_nfe_ref = VALUES(data_nfe_ref),
-      chave_nfe_ref = VALUES(chave_nfe_ref)
-  `
+      INSERT INTO ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
+        (status, venda_remesa, NFe, serie, nome, chave,
+        modalidade, operacao, tipo_logistico,
+        emissao, valor, valor_total, frete,
+        observacao, data_nfe_ref, chave_nfe_ref)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE
+        status = VALUES(status),
+        venda_remesa = VALUES(venda_remesa),
+        NFe = VALUES(NFe),
+        serie = VALUES(serie),
+        nome = VALUES(nome),
+        modalidade = VALUES(modalidade),
+        operacao = VALUES(operacao),
+        tipo_logistico = VALUES(tipo_logistico),
+        emissao = VALUES(emissao),
+        valor = VALUES(valor),
+        valor_total = VALUES(valor_total),
+        frete = VALUES(frete),
+        observacao = VALUES(observacao),
+        data_nfe_ref = VALUES(data_nfe_ref),
+        chave_nfe_ref = VALUES(chave_nfe_ref)
+    `
   let atualizadas = 0
   for (const nota of notas) {
     try {
-      console.log('[MERCADOLIVRE][DB] Processando nota', {
-        chave: nota.chave,
-        serie: nota.serie,
-        tipo: nota.tipo_logistico
-      })
 
       if (await isSerieIgnorada(nota.serie)) {
         ignoradasSerie++
-        console.log('[MERCADOLIVRE][DB] Ignorada por série', nota.chave)
         continue
       }
 
       if (nota.tipo_logistico === 'Cross Docking') {
         ignoradasTipo++
-        console.log('[MERCADOLIVRE][DB] Ignorada (Cross Docking)', nota.chave)
         continue
       }
 
@@ -140,37 +133,14 @@ export async function salvarNotasTmpMercadoLivre(
       if (result.affectedRows === 1) {
         inseridasNovas++
         console.log('[MERCADOLIVRE][DB] Inserida nova nota', nota.chave)
-      } else if (result.affectedRows === 2) {
+      }
+
+      if (result.affectedRows === 2) {
         atualizadas++
         console.log('[MERCADOLIVRE][DB] Nota atualizada', nota.chave)
       }
 
       inseridas.push(nota)
-
-
-      await poolMonitoramento.execute(sql, [
-        nota.status ?? null,
-        nota.venda_remessa ?? null,
-        nota.NFe ?? null,
-        nota.serie ?? null,
-        nota.nome ?? null,
-        nota.chave,
-        nota.modalidade ?? null,
-        nota.operacao ?? null,
-        nota.tipo_logistico ?? null,
-        nota.emissao ?? null,
-        nota.valor ?? null,
-        nota.valor_total ?? null,
-        nota.frete ?? null,
-        nota.observacao ?? null,
-        nota.data_nfe_ref ?? null,
-        nota.chave_nfe_ref ?? null
-      ])
-
-      inseridasNovas++
-      inseridas.push(nota)
-
-      console.log('[MERCADOLIVRE][DB] Inserida com sucesso', nota.chave)
 
     } catch (err) {
       erros++
@@ -201,29 +171,29 @@ export async function salvarNotasTmpMercadoLivre(
  */
 export async function verificarECriarTabelaTmpNotas(): Promise<void> {
   const sql = `
-    CREATE TABLE IF NOT EXISTS ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas (
-      status varchar(100) DEFAULT NULL,
-      venda_remesa varchar(100) DEFAULT NULL,
-      NFe varchar(100) DEFAULT NULL,
-      serie varchar(100) DEFAULT NULL,
-      nome varchar(100) DEFAULT NULL,
-      chave varchar(100) NOT NULL,
-      modalidade varchar(100) DEFAULT NULL,
-      operacao varchar(100) DEFAULT NULL,
-      tipo_logistico varchar(100) DEFAULT NULL,
-      emissao varchar(100) DEFAULT NULL,
-      valor varchar(100) DEFAULT NULL,
-      valor_total varchar(100) DEFAULT NULL,
-      frete varchar(100) DEFAULT NULL,
-      observacao varchar(100) DEFAULT NULL,
-      data_nfe_ref varchar(100) DEFAULT NULL,
-      chave_nfe_ref varchar(100) DEFAULT NULL,
-      PRIMARY KEY (chave),
-      KEY i2 (NFe, serie),
-      KEY i3 (chave_nfe_ref),
-      KEY i4 (status)
-    ) ENGINE=MyISAM DEFAULT CHARSET=latin1
-  `
+      CREATE TABLE IF NOT EXISTS ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas (
+        status varchar(100) DEFAULT NULL,
+        venda_remesa varchar(100) DEFAULT NULL,
+        NFe varchar(100) DEFAULT NULL,
+        serie varchar(100) DEFAULT NULL,
+        nome varchar(100) DEFAULT NULL,
+        chave varchar(100) NOT NULL,
+        modalidade varchar(100) DEFAULT NULL,
+        operacao varchar(100) DEFAULT NULL,
+        tipo_logistico varchar(100) DEFAULT NULL,
+        emissao varchar(100) DEFAULT NULL,
+        valor varchar(100) DEFAULT NULL,
+        valor_total varchar(100) DEFAULT NULL,
+        frete varchar(100) DEFAULT NULL,
+        observacao varchar(100) DEFAULT NULL,
+        data_nfe_ref varchar(100) DEFAULT NULL,
+        chave_nfe_ref varchar(100) DEFAULT NULL,
+        PRIMARY KEY (chave),
+        KEY i2 (NFe, serie),
+        KEY i3 (chave_nfe_ref),
+        KEY i4 (status)
+      ) ENGINE=MyISAM DEFAULT CHARSET=latin1
+    `
 
   await poolMonitoramento.execute(sql)
   console.log('[MERCADOLIVRE][DB] tmp_notas verificada/criada')
@@ -273,12 +243,12 @@ export async function buscarLogNotaNaoIntegrada(
   chaveNfe: string
 ): Promise<{ remarks?: string; log?: string; storeno?: string } | null> {
   const sql = `
-    SELECT remarks, log, storeno
-      FROM ${coreConfig.DB_NAME_DADOS}.lognerusff
-     WHERE nfKey = ?
-     ORDER BY seqnoAuto DESC
-     LIMIT 1
-  `
+      SELECT remarks, log, storeno
+        FROM ${coreConfig.DB_NAME_DADOS}.lognerusff
+      WHERE nfKey = ?
+      ORDER BY seqnoAuto DESC
+      LIMIT 1
+    `
 
   const [rows] = await poolMain.query(sql, [chaveNfe])
   return (rows as any[])[0] ?? null
@@ -297,32 +267,32 @@ export async function buscarNotasNaoIntegradasNerusPorChaves(
   const placeholders = chaves.map(() => '?').join(', ')
 
   const sql = `
-  SELECT
-    t.chave AS CHAVE_NFE,
-    t.NFe   AS NFE,
-    t.serie AS SERIE,
-    DATE_FORMAT(
-      STR_TO_DATE(t.emissao, '%d/%m/%Y %H:%i:%s'),
-      '%Y-%m-%d %H:%i:%s'
-    ) AS EMISSAO,
-    t.valor_total    AS VALOR_TOTAL,
-    t.tipo_logistico AS TIPO_LOGISTICO,
-    t.status         AS STATUS,
-    t.modalidade     AS MODALIDADE
-  FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas t
-  WHERE t.chave IN (${placeholders})
-    AND NOT EXISTS (
-      SELECT 1
-      FROM ${coreConfig.DB_NAME_DADOS}.nfeavxml n
-      WHERE n.nfkey = t.chave
-        AND n.storeno IN (${coreConfig.STORENOS
+    SELECT
+      t.chave AS CHAVE_NFE,
+      t.NFe   AS NFE,
+      t.serie AS SERIE,
+      DATE_FORMAT(
+        STR_TO_DATE(t.emissao, '%d/%m/%Y %H:%i:%s'),
+        '%Y-%m-%d %H:%i:%s'
+      ) AS EMISSAO,
+      t.valor_total    AS VALOR_TOTAL,
+      t.tipo_logistico AS TIPO_LOGISTICO,
+      t.status         AS STATUS,
+      t.modalidade     AS MODALIDADE
+    FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas t
+    WHERE t.chave IN (${placeholders})
+      AND NOT EXISTS (
+        SELECT 1
+        FROM ${coreConfig.DB_NAME_DADOS}.nfeavxml n
+        WHERE n.nfkey = t.chave
+          AND n.storeno IN (${coreConfig.STORENOS
       .split(',')
       .map(id => `'${id.trim()}'`)
       .join(', ')})
-    )
-  ORDER BY
-    STR_TO_DATE(t.emissao, '%d/%m/%Y %H:%i:%s') DESC
-`
+      )
+    ORDER BY
+      STR_TO_DATE(t.emissao, '%d/%m/%Y %H:%i:%s') DESC
+  `
 
   const [rows] = await poolMonitoramento.query(sql, chaves)
 
@@ -342,12 +312,12 @@ export async function getRetryCountFfpreprocnf(params: {
   storeno: number
 }): Promise<number | null> {
   const sql = `
-    SELECT MAX(retryCount) AS retryCount
-      FROM ${coreConfig.DB_NAME_DADOS}.ffpreprocnf
-     WHERE nfno = ?
-       AND nfse = ?
-       AND storeno = ?
-  `
+      SELECT MAX(retryCount) AS retryCount
+        FROM ${coreConfig.DB_NAME_DADOS}.ffpreprocnf
+      WHERE nfno = ?
+        AND nfse = ?
+        AND storeno = ?
+    `
 
   const [rows] = await poolMain.query(sql, [
     params.nfno,
@@ -368,13 +338,13 @@ export async function zerarRetryCountFfpreprocnf(params: {
   storeno: number
 }): Promise<number> {
   const sql = `
-    UPDATE ${coreConfig.DB_NAME_DADOS}.ffpreprocnf
-       SET retryCount = 0
-     WHERE nfno = ?
-       AND nfse = ?
-       AND storeno = ?
-     LIMIT 1
-  `
+      UPDATE ${coreConfig.DB_NAME_DADOS}.ffpreprocnf
+        SET retryCount = 0
+      WHERE nfno = ?
+        AND nfse = ?
+        AND storeno = ?
+      LIMIT 1
+    `
 
   const [res] = await poolMain.query(sql, [
     params.nfno,
@@ -387,22 +357,22 @@ export async function zerarRetryCountFfpreprocnf(params: {
 
 export async function buscarCredenciaisMercadoLivre(): Promise<MercadoLivreCredential[]> {
   const sql = `
-    SELECT
-      u.userId AS clienteId,
-      u.clientSecret AS clientSecret,
-      u.accessToken AS accessToken,
-      u.refreshToken AS refreshToken,
+      SELECT
+        u.userId AS clienteId,
+        u.clientSecret AS clientSecret,
+        u.accessToken AS accessToken,
+        u.refreshToken AS refreshToken,
 
-      CASE u.clientSecret
-        WHEN 'gcqTSgpZcUSeFuvS9EjM5EwO83DzZWwN' THEN '7728772652676163'
-        WHEN '3WNCDQ6jJOJJfcGVpZtb4YyyVhewL4Ai' THEN '3190113795567312'
-        ELSE NULL
-      END AS clientId
+        CASE u.clientSecret
+          WHEN 'gcqTSgpZcUSeFuvS9EjM5EwO83DzZWwN' THEN '7728772652676163'
+          WHEN '3WNCDQ6jJOJJfcGVpZtb4YyyVhewL4Ai' THEN '3190113795567312'
+          ELSE NULL
+        END AS clientId
 
-    FROM ${coreConfig.DB_NAME_DADOS}.userfull u
-    WHERE u.accessToken IS NOT NULL
-      AND u.refreshToken IS NOT NULL
-  `
+      FROM ${coreConfig.DB_NAME_DADOS}.userfull u
+      WHERE u.accessToken IS NOT NULL
+        AND u.refreshToken IS NOT NULL
+    `
 
   const [rows] = await poolMain.query(sql)
 
