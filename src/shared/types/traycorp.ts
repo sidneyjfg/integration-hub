@@ -20,6 +20,4 @@ export interface TrayCorpProductBody {
   dataCriacao?: string;
   dataAtualizacao?: string;
   parentId?: number;
-
-  raw_payload: Record<string, unknown>;
 }

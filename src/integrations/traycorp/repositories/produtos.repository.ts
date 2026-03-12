@@ -19,8 +19,8 @@ export async function salvarProdutosTempTraycorp(
       ean,
       centroDistribuicaoId, estoqueFisico, estoqueReservado, alertaEstoque,
       dataCriacao, dataAtualizacao,
-      parentId, raw_payload
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      parentId
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       precoCusto = VALUES(precoCusto),
       precoDe = VALUES(precoDe),
@@ -28,8 +28,7 @@ export async function salvarProdutosTempTraycorp(
       estoqueFisico = VALUES(estoqueFisico),
       estoqueReservado = VALUES(estoqueReservado),
       alertaEstoque = VALUES(alertaEstoque),
-      dataAtualizacao = VALUES(dataAtualizacao),
-      raw_payload = VALUES(raw_payload)
+      dataAtualizacao = VALUES(dataAtualizacao)
   `;
 
   try {
@@ -76,8 +75,7 @@ export async function salvarProdutosTempTraycorp(
         estoque.alertaEstoque ?? null,
         produto.dataCriacao ?? null,
         produto.dataAtualizacao ?? null,
-        produto.parentId ?? null,
-        JSON.stringify(produto.raw_payload ?? produto),
+        produto.parentId ?? null
       ]);
     }
 
