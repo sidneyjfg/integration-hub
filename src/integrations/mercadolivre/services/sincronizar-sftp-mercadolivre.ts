@@ -170,6 +170,7 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
 
       const notification = await buildMercadoLivreSftpNotification({
         clienteId,
+        clientName: mercadolivreConfig.CLIENT_NAME ?? clienteId,
         modo,
         notas: modo === 'SFTP_VONDER_LEDGER' ? [] : notasEnviadas,
         totalEncontradas:

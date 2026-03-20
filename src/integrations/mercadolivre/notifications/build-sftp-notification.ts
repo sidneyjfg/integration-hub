@@ -2,6 +2,7 @@ import { mercadolivreConfig } from '../env.schema'
 
 type BuildNotificationParams = {
   clienteId: string
+  clientName: string
   modo: string
   notas: { tipoNota: string }[]
   totalEncontradas: number
@@ -19,6 +20,7 @@ export async function buildMercadoLivreSftpNotification(
 ): Promise<string> {
   const {
     clienteId,
+    clientName,
     modo,
     notas,
     startDate,
@@ -49,7 +51,7 @@ export async function buildMercadoLivreSftpNotification(
     if (!temFiltro) {
       return (
         `📤 *Mercado Livre • LOCAL LEDGER*\n` +
-        `Cliente: ${clienteId}\n` +
+        `Cliente: ${clientName} (${clienteId})\n` +
         `Período: ${startDate} → ${endDate}\n\n` +
         `📥 Total encontradas: ${totalEncontradas}\n` +
         `📤 Total enviadas (novas): ${totalEnviadas}\n`
@@ -71,7 +73,7 @@ export async function buildMercadoLivreSftpNotification(
 
     return (
       `📤 *Mercado Livre • LOCAL LEDGER*\n` +
-      `Cliente: ${clienteId}\n` +
+      `Cliente: ${clientName} (${clienteId})\n` +
       `Período: ${startDate} → ${endDate}\n\n` +
       `${detalhes}\n\n` +
       `📊 Total enviados (novos): ${totalEnviadas}\n`
@@ -83,7 +85,7 @@ export async function buildMercadoLivreSftpNotification(
 
     return (
       `📤 *Mercado Livre • SFTP VONDER LEDGER*\n` +
-      `Cliente: ${clienteId}\n` +
+      `Cliente: ${clientName} (${clienteId})\n` +
       `Período: ${startDate} → ${endDate}\n\n` +
       `📂 IN (NF-e): ${IN}\n` +
       `📦 CTE: ${CTE}\n` +
@@ -105,7 +107,7 @@ export async function buildMercadoLivreSftpNotification(
 
   return (
     `📤 *Mercado Livre • ${modo.replace(/_/g, ' ')}*\n` +
-    `Cliente: ${clienteId}\n` +
+    `Cliente: ${clientName} (${clienteId})\n` +
     `Período: ${startDate} → ${endDate}\n\n` +
     `${detalhes}\n\n` +
     sftpInfo
