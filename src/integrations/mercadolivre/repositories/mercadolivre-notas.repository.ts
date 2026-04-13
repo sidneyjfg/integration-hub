@@ -276,10 +276,7 @@ export async function buscarNotasNaoIntegradasNerusPorChaves(
       t.chave AS CHAVE_NFE,
       t.NFe   AS NFE,
       t.serie AS SERIE,
-      DATE_FORMAT(
-        STR_TO_DATE(t.emissao, '%d/%m/%Y %H:%i:%s'),
-        '%Y-%m-%d %H:%i:%s'
-      ) AS EMISSAO,
+      t.emissao AS EMISSAO,
       t.valor_total    AS VALOR_TOTAL,
       t.tipo_logistico AS TIPO_LOGISTICO,
       t.status         AS STATUS,
@@ -296,7 +293,7 @@ export async function buscarNotasNaoIntegradasNerusPorChaves(
       .join(', ')})
       )
     ORDER BY
-      STR_TO_DATE(t.emissao, '%d/%m/%Y %H:%i:%s') DESC
+      t.emissao DESC
   `
 
   const [rows] = await poolMonitoramento.query(sql, chaves)
