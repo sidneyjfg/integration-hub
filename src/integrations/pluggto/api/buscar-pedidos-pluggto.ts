@@ -8,6 +8,14 @@ import {
 } from '../../../shared/types'
 import { getDateRange } from '../utils'
 
+// 🔥 Parse único (fora da função)
+const IGNORED_STATUS = new Set(
+  (pluggtoConfig.PLUGGTO_NO_LOOK_STATUS_TYPES || '')
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(Boolean)
+)
+
 export async function buscarPedidosPluggto(): Promise<PluggtoOrderBody[]> {
   console.log('[PLUGGTO][SYNC] Iniciando busca de pedidos')
 
@@ -23,6 +31,8 @@ export async function buscarPedidosPluggto(): Promise<PluggtoOrderBody[]> {
   const pedidos: PluggtoOrderBody[] = []
   let next: string | null = null
   let page = 1
+
+  let ignorados = 0
 
   try {
     do {
@@ -48,6 +58,15 @@ export async function buscarPedidosPluggto(): Promise<PluggtoOrderBody[]> {
 
       for (const item of lote) {
         const o = item.Order
+
+        const status = (o.status || '').toLowerCase()
+
+        // 🚫 ignora status configurados
+        if (IGNORED_STATUS.has(status)) {
+          ignorados++
+          continue
+        }
+
         const shipment = o.shipments?.[0]
         const payment = o.payments?.[0]
 
@@ -97,7 +116,8 @@ export async function buscarPedidosPluggto(): Promise<PluggtoOrderBody[]> {
     } while (next)
 
     console.log('[PLUGGTO][SYNC] Busca finalizada', {
-      totalPedidos: pedidos.length
+      totalPedidos: pedidos.length,
+      ignorados
     })
 
     return pedidos
