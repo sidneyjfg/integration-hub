@@ -14,45 +14,52 @@ export function buildNotasNaoIntegradasCard(
     if (nota.EMISSAO) {
       const valor = String(nota.EMISSAO)
 
-      // 🔥 caso AAAAMMDD (ex: 20260413)
+      // AAAAMMDD
       if (/^\d{8}$/.test(valor)) {
         const ano = valor.slice(0, 4)
         const mes = valor.slice(4, 6)
         const dia = valor.slice(6, 8)
         dataFormatada = `${dia}/${mes}/${ano}`
       } else {
-        // fallback (datetime ou outro formato)
         const data = new Date(valor)
-        if (!isNaN(data.getTime())) {
-          dataFormatada = data.toLocaleString('pt-BR')
-        } else {
-          dataFormatada = valor
-        }
+        dataFormatada = !isNaN(data.getTime())
+          ? data.toLocaleString('pt-BR')
+          : valor
       }
     }
 
     return {
-      textParagraph: {
-        text: `
-          <b style="font-size:16px">
-            ${nota.NFE ?? '-'} / ${nota.SERIE ?? '-'}
-          </b><br/>
-          <font color="#888888" size="2">
-            ${dataFormatada}
-          </font>
-        `
+      decoratedText: {
+        startIcon: {
+          knownIcon: "DESCRIPTION" // ícone de documento
+        },
+        text: `<b>${nota.NFE ?? '-'} / ${nota.SERIE ?? '-'}</b>`,
+        bottomLabel: `📅 ${dataFormatada}`
       }
     }
   })
 
   return {
-    header: {
-      title: '⚠️ Notas não integradas',
-      subtitle: `Mercado Livre • Conta ${clienteId}`
-    },
-    sections: [
+    cardsV2: [
       {
-        widgets
+        cardId: "notas-nao-integradas",
+        card: {
+          header: {
+            title: "⚠️ Notas não integradas",
+            subtitle: `Mercado Livre • Conta ${clienteId}`,
+            imageUrl: "https://cdn-icons-png.flaticon.com/512/1828/1828843.png",
+            imageType: "CIRCLE",
+            imageAltText: "Alerta"
+          },
+          sections: [
+            {
+              header: "Notas pendentes de integração",
+              collapsible: true,
+              uncollapsibleWidgetsCount: 5,
+              widgets
+            }
+          ]
+        }
       }
     ]
   }
