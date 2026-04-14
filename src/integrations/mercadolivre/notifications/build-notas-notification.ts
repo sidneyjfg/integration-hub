@@ -47,9 +47,6 @@ export function buildNotasNaoIntegradasCard(
           header: {
             title: "⚠️ Notas não integradas",
             subtitle: `Mercado Livre • Conta ${clienteId}`,
-            imageUrl: "https://cdn-icons-png.flaticon.com/512/1828/1828843.png",
-            imageType: "CIRCLE",
-            imageAltText: "Alerta"
           },
           sections: [
             {
