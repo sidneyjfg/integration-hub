@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<nfeProc>
+  <NFe>
+    <infNFe Id="NFe35222222222222222222222222222222222222222222">
+      <ide>
+        <nNF>1002</nNF>
+        <serie>2</serie>
+        <dhEmi>2026-04-11T11:30:00-03:00</dhEmi>
+        <natOp>Remessa para deposito temporario</natOp>
+      </ide>
+      <dest>
+        <CNPJ>12345678000199</CNPJ>
+        <xNome>Cliente Teste 2</xNome>
+      </dest>
+      <det>
+        <infAdProd>Pedido 50002</infAdProd>
+      </det>
+      <total>
+        <ICMSTot>
+          <vProd>200.00</vProd>
+          <vNF>220.00</vNF>
+          <vFrete>20.00</vFrete>
+        </ICMSTot>
+      </total>
+    </infNFe>
+  </NFe>
+  <protNFe>
+    <infProt>
+      <cStat>100</cStat>
+      <xMotivo>Autorizado o uso da NF-e</xMotivo>
+    </infProt>
+  </protNFe>
+</nfeProc>

@@ -4,6 +4,7 @@
   "scripts": {
     "dev": "nodemon",
     "build": "tsc",
+    "test": "node -r ts-node/register/transpile-only tests/run-tests.ts",
     "start": "node dist/core/server.js"
   },
   "dependencies": {

@@ -7,6 +7,9 @@ type GoogleChatMessage =
       cards: unknown[]
     }
   | {
+      cardsV2: unknown[]
+    }
+  | {
       header?: unknown
       sections?: unknown[]
     }
@@ -33,6 +36,8 @@ export async function notifyGoogleChat(
       ? { text: message }
       : 'cards' in message
         ? message
+        : 'cardsV2' in message
+          ? message
         : { cards: [message] }
 
   try {

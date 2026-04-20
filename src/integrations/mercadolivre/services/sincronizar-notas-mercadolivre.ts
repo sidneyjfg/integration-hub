@@ -97,7 +97,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
             clienteId
           )
 
-          await notifyGoogleChat({ cards: [card] })
+          await notifyGoogleChat(card)
         }
         else {
           await notifyGoogleChat(
