@@ -1,4 +1,7 @@
-import { buscarPedidosPluggto } from '../api/buscar-pedidos-pluggto'
+import {
+    buscarPedidosPluggto,
+    getUltimoResumoBuscaPedidosPluggto
+} from '../api/buscar-pedidos-pluggto'
 import { reenviarPedidoPluggto } from './reenviar-pedidos-pluggto'
 import {
     buscarPedidosNaoIntegrados,
@@ -11,10 +14,17 @@ export async function sincronizarPedidosPluggto() {
     console.log('[PLUGGTO][SYNC] Iniciando pedidos')
 
     const pedidos = await buscarPedidosPluggto()
+    const resumoFiltro = formatarResumoFiltroStatus(getUltimoResumoBuscaPedidosPluggto())
 
     if (pedidos.length === 0) {
         console.log('[PLUGGTO][SYNC] Nenhum pedido encontrado')
-        await notifyGoogleChat('✅ Nenhum pedido encontrado na Pluggto')
+        await notifyGoogleChat(
+            [
+                '✅ Nenhum pedido encontrado na Pluggto',
+                '',
+                ...resumoFiltro
+            ].join('\n')
+        )
         return
     }
 
@@ -39,6 +49,8 @@ export async function sincronizarPedidosPluggto() {
                 '⚠️ *Pedidos Pluggto não integrados encontrados*',
                 '',
                 `Total: ${naoIntegrados.length}`,
+                '',
+                ...resumoFiltro,
                 '',
                 ...linhas
             ].join('\n')
@@ -77,6 +89,8 @@ export async function sincronizarPedidosPluggto() {
             '',
             `Total: ${naoIntegrados.length}`,
             '',
+            ...resumoFiltro,
+            '',
             ...naoIntegrados.map(formatarLinhaPedido),
             ''
         )
@@ -105,5 +119,19 @@ export async function sincronizarPedidosPluggto() {
         await notifyGoogleChat(mensagens.join('\n'))
     }
 
+}
+
+function formatarResumoFiltroStatus(resumo: {
+    ignorados: number
+    statusIgnorados: string[]
+}) {
+    if (!resumo.statusIgnorados.length) {
+        return ['Filtro PLUGGTO_NO_LOOK_STATUS_TYPES: nenhum status configurado']
+    }
+
+    return [
+        `Filtro PLUGGTO_NO_LOOK_STATUS_TYPES: ${resumo.statusIgnorados.join(', ')}`,
+        `Pedidos ignorados pelo filtro: ${resumo.ignorados}`
+    ]
 }
 

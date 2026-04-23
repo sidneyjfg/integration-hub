@@ -21,6 +21,26 @@ const tests: TestCase[] = [
   {
     name: 'integration: sincronizar-notas',
     file: path.resolve(__dirname, 'mercadolivre/sincronizar-notas.integration.test.ts')
+  },
+  {
+    name: 'integration: pluggto buscar-pedidos com filtro de status',
+    file: path.resolve(__dirname, 'pluggto/buscar-pedidos.integration.test.ts')
+  },
+  {
+    name: 'integration: pluggto salvar 4 pedidos',
+    file: path.resolve(__dirname, 'pluggto/salvar-pedidos.integration.test.ts')
+  },
+  {
+    name: 'integration: pluggto todos integrados',
+    file: path.resolve(__dirname, 'pluggto/sincronizar-pedidos-all-integrated.integration.test.ts')
+  },
+  {
+    name: 'integration: pluggto com pedidos nao integrados',
+    file: path.resolve(__dirname, 'pluggto/sincronizar-pedidos-nao-integrados.integration.test.ts')
+  },
+  {
+    name: 'integration: pluggto ignora status configurados',
+    file: path.resolve(__dirname, 'pluggto/sincronizar-pedidos-status-ignorados.integration.test.ts')
   }
 ]
 

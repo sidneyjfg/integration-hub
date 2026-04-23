@@ -10,11 +10,30 @@ import { getDateRange } from '../utils'
 
 // 🔥 Parse único (fora da função)
 const IGNORED_STATUS = new Set(
-  (pluggtoConfig.PLUGGTO_NO_LOOK_STATUS_TYPES || '')
+  (
+    pluggtoConfig.PLUGGTO_NO_LOOK_STATUS_TYPES ||
+    ''
+  )
     .split(',')
     .map(s => s.trim().toLowerCase())
     .filter(Boolean)
 )
+
+export type BuscarPedidosPluggtoResumo = {
+  totalPedidos: number
+  ignorados: number
+  statusIgnorados: string[]
+}
+
+let ultimoResumoBuscaPedidos: BuscarPedidosPluggtoResumo = {
+  totalPedidos: 0,
+  ignorados: 0,
+  statusIgnorados: Array.from(IGNORED_STATUS)
+}
+
+export function getUltimoResumoBuscaPedidosPluggto(): BuscarPedidosPluggtoResumo {
+  return ultimoResumoBuscaPedidos
+}
 
 export async function buscarPedidosPluggto(): Promise<PluggtoOrderBody[]> {
   console.log('[PLUGGTO][SYNC] Iniciando busca de pedidos')
@@ -119,6 +138,12 @@ export async function buscarPedidosPluggto(): Promise<PluggtoOrderBody[]> {
       totalPedidos: pedidos.length,
       ignorados
     })
+
+    ultimoResumoBuscaPedidos = {
+      totalPedidos: pedidos.length,
+      ignorados,
+      statusIgnorados: Array.from(IGNORED_STATUS)
+    }
 
     return pedidos
   } catch (erro) {

@@ -7,7 +7,7 @@ export const pluggtoEnvSchema = z.object({
     PLUGGTO_USERNAME: z.string(),
     PLUGGTO_PASSWORD: z.string(),
     PLUGGTO_DAYS_TO_FETCH: z.string(),
-    PLUGGTO_NO_LOOK_STATUS_TYPES: z.string(),
+    PLUGGTO_NO_LOOK_STATUS_TYPES: z.string().optional().default(''),
     // 🔔 endpoint do Nérus para reenvio
     NERUS_RECEIVE_ORDER_URL: z
         .string()
