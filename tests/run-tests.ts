@@ -23,6 +23,10 @@ const tests: TestCase[] = [
     file: path.resolve(__dirname, 'mercadolivre/sincronizar-notas.integration.test.ts')
   },
   {
+    name: 'integration: sincronizar-notas sem max retry',
+    file: path.resolve(__dirname, 'mercadolivre/sincronizar-notas-sem-max-retry.integration.test.ts')
+  },
+  {
     name: 'integration: pluggto buscar-pedidos com filtro de status',
     file: path.resolve(__dirname, 'pluggto/buscar-pedidos.integration.test.ts')
   },

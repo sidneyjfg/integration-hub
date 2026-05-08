@@ -26,7 +26,10 @@ export const mercadolivreEnvSchema = z.object({
     // ⚠️ Comportamentos opcionais
     MERCADOLIVRE_DISPONIBILIZA_XML_DIVERGENTE: z.preprocess(toBool, z.boolean()).default(false),
 
-    MERCADOLIVRE_MAX_RETRY_COUNT: z.coerce.number().min(0).optional(),
+    MERCADOLIVRE_MAX_RETRY_COUNT: z.preprocess(
+        value => value === '' ? undefined : value,
+        z.coerce.number().min(0).optional()
+    ),
 
     MERCADOLIVRE_SFTP_ENABLED: z.preprocess(toBool, z.boolean()).default(false),
     MERCADOLIVRE_SFTP_DIR: z.string().default(''),

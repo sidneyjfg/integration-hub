@@ -3,17 +3,74 @@ import {
   // buscarNotasNaoIntegradasNerus,
   buscarNotasNaoIntegradasNerusPorChaves,
   verificarECriarTabelaTmpNotas,
-  buscarCredenciaisMercadoLivre
+  buscarCredenciaisMercadoLivre,
+  getRetryCountFfpreprocnf,
+  zerarRetryCountFfpreprocnf,
+  atualizarNfcacheEtiquetaDiaAtual
 } from '../repositories/mercadolivre-notas.repository'
 import { notifyGoogleChat } from '../notifications/google-chat'
 import { buscarNotasMercadoLivre } from '../api/buscar-notas-mercadolivre'
 import { mercadolivreConfig } from '../env.schema'
 import { buildNotasNaoIntegradasCard } from '../notifications/build-notas-notification'
+import { coreConfig } from '../../../core/env.schema'
+
+async function processarRetryNotasNaoIntegradas(
+  notasNaoIntegradas: Array<{ CHAVE_NFE?: string }>
+): Promise<void> {
+  const maxRetryCount = mercadolivreConfig.MERCADOLIVRE_MAX_RETRY_COUNT
+
+  if (maxRetryCount == null) return
+
+  let avaliadas = 0
+  let zeradas = 0
+  let ignoradas = 0
+  let semRetryCount = 0
+
+  for (const nota of notasNaoIntegradas) {
+    const nfeKey = nota.CHAVE_NFE
+
+    if (!nfeKey) {
+      ignoradas++
+      continue
+    }
+
+    const retryCount = await getRetryCountFfpreprocnf({ nfeKey })
+    avaliadas++
+
+    if (retryCount == null) {
+      semRetryCount++
+      continue
+    }
+
+    if (retryCount < maxRetryCount) {
+      const affectedRows = await zerarRetryCountFfpreprocnf({ nfeKey })
+      if (affectedRows > 0) zeradas++
+      continue
+    }
+
+    ignoradas++
+  }
+
+  console.log('[MERCADOLIVRE][SYNC][RETRY] Processamento finalizado', {
+    maxRetryCount,
+    avaliadas,
+    zeradas,
+    ignoradas,
+    semRetryCount
+  })
+}
 
 export async function sincronizarNotasMercadoLivre(): Promise<void> {
   console.log('[MERCADOLIVRE][SYNC] Iniciando sincronização de notas')
 
   try {
+    if (coreConfig.USA_ETIQUETA) {
+      const affectedRows = await atualizarNfcacheEtiquetaDiaAtual()
+      console.log('[MERCADOLIVRE][SYNC][ETIQUETA] nfcache atualizado', {
+        affectedRows
+      })
+    }
+
     console.log('[MERCADOLIVRE][SYNC] Verificando tabela tmp_notas')
     await verificarECriarTabelaTmpNotas()
     console.log('[MERCADOLIVRE][SYNC] Tabela tmp_notas OK')
@@ -85,6 +142,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
         })
 
         if (notasNaoIntegradas.length > 0) {
+          await processarRetryNotasNaoIntegradas(notasNaoIntegradas)
 
           // 🔔 resumo
           await notifyGoogleChat(

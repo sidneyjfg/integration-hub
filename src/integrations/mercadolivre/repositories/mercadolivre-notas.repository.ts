@@ -309,23 +309,15 @@ export async function buscarNotasNaoIntegradasNerusPorChaves(
  * 🔁 Lê o retryCount atual da ffpreprocnf
  */
 export async function getRetryCountFfpreprocnf(params: {
-  nfno: string
-  nfse: string
-  storeno: number
+  nfeKey: string
 }): Promise<number | null> {
   const sql = `
       SELECT MAX(retryCount) AS retryCount
         FROM ${coreConfig.DB_NAME_DADOS}.ffpreprocnf
-      WHERE nfno = ?
-        AND nfse = ?
-        AND storeno = ?
+      WHERE nfeKey = ?
     `
 
-  const [rows] = await poolMain.query(sql, [
-    params.nfno,
-    params.nfse,
-    params.storeno
-  ])
+  const [rows] = await poolMain.query(sql, [params.nfeKey])
 
   const value = (rows as any[])[0]?.retryCount
   return value != null ? Number(value) : null
@@ -335,24 +327,39 @@ export async function getRetryCountFfpreprocnf(params: {
  * 🔁 Zera retryCount na ffpreprocnf
  */
 export async function zerarRetryCountFfpreprocnf(params: {
-  nfno: string
-  nfse: string
-  storeno: number
+  nfeKey: string
 }): Promise<number> {
   const sql = `
       UPDATE ${coreConfig.DB_NAME_DADOS}.ffpreprocnf
         SET retryCount = 0
-      WHERE nfno = ?
-        AND nfse = ?
-        AND storeno = ?
+      WHERE nfeKey = ?
       LIMIT 1
     `
 
-  const [res] = await poolMain.query(sql, [
-    params.nfno,
-    params.nfse,
-    params.storeno
-  ])
+  const [res] = await poolMain.query(sql, [params.nfeKey])
+
+  return (res as any).affectedRows ?? 0
+}
+
+function getHojeFormatoNerus(): string {
+  const date = new Date()
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+
+  return `${year}${month}${day}`
+}
+
+export async function atualizarNfcacheEtiquetaDiaAtual(): Promise<number> {
+  const hoje = getHojeFormatoNerus()
+  const sql = `
+      UPDATE ${coreConfig.DB_NAME_DADOS}.nfcache
+        SET updatedAt = NOW()
+      WHERE sync = 0
+        AND date = ?
+    `
+
+  const [res] = await poolMain.query(sql, [hoje])
 
   return (res as any).affectedRows ?? 0
 }

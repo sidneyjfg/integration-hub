@@ -1,6 +1,14 @@
 export function applyMercadoLivreTestEnv(
   overrides: Record<string, string> = {}
 ): void {
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'MERCADOLIVRE_MAX_RETRY_COUNT')) {
+    delete process.env.MERCADOLIVRE_MAX_RETRY_COUNT
+  }
+
+  if (!Object.prototype.hasOwnProperty.call(overrides, 'USA_ETIQUETA')) {
+    delete process.env.USA_ETIQUETA
+  }
+
   Object.assign(process.env, {
     PORT: '3000',
     DB_HOST_MONITORAMENTO: 'localhost',

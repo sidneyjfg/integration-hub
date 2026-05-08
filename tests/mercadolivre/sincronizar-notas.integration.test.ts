@@ -81,10 +81,15 @@ export = async function runSincronizarNotasIntegrationTest(): Promise<void> {
     }
 
     applyMercadoLivreTestEnv({
-      GOOGLE_CHAT_WEBHOOK_URL: `http://127.0.0.1:${address.port}/webhook`
+      GOOGLE_CHAT_WEBHOOK_URL: `http://127.0.0.1:${address.port}/webhook`,
+      MERCADOLIVRE_MAX_RETRY_COUNT: '5',
+      USA_ETIQUETA: 'true'
     })
   } else {
-    applyMercadoLivreTestEnv()
+    applyMercadoLivreTestEnv({
+      MERCADOLIVRE_MAX_RETRY_COUNT: '5',
+      USA_ETIQUETA: 'true'
+    })
   }
 
   clearModules([
@@ -114,12 +119,20 @@ export = async function runSincronizarNotasIntegrationTest(): Promise<void> {
   ]
 
   const insertExecutions: Array<{ sql: string; params: unknown[] }> = []
+  const retryCountQueries: unknown[][] = []
+  const retryCountUpdates: unknown[][] = []
+  const nfcacheUpdates: unknown[][] = []
   const axiosMock = createMercadoLivreAxiosMock({ notifications })
   const realUtils = require(utilsModulePath) as UtilsModule
 
   const dbMock = {
     poolMain: {
-      query: async (sql: string) => {
+      query: async (sql: string, params?: unknown[]) => {
+        if (sql.includes('UPDATE dados.nfcache')) {
+          nfcacheUpdates.push(params ?? [])
+          return [{ affectedRows: 2 }]
+        }
+
         if (sql.includes('.userfull u')) {
           return [[
             {
@@ -130,6 +143,24 @@ export = async function runSincronizarNotasIntegrationTest(): Promise<void> {
               refreshToken: 'refresh-token'
             }
           ]]
+        }
+
+        if (sql.includes('SELECT MAX(retryCount) AS retryCount')) {
+          retryCountQueries.push(params ?? [])
+          const nfeKey = params?.[0]
+
+          if (nfeKey === '35222222222222222222222222222222222222222222') {
+            return [[{ retryCount: 3 }]]
+          }
+
+          if (nfeKey === '35333333333333333333333333333333333333333333') {
+            return [[{ retryCount: 9 }]]
+          }
+        }
+
+        if (sql.includes('UPDATE dados.ffpreprocnf')) {
+          retryCountUpdates.push(params ?? [])
+          return [{ affectedRows: 1 }]
         }
 
         return [[]]
@@ -178,7 +209,16 @@ export = async function runSincronizarNotasIntegrationTest(): Promise<void> {
   try {
     await sincronizarNotasMercadoLivre()
 
+    assert.equal(nfcacheUpdates.length, 1)
+    assert.match(String(nfcacheUpdates[0][0]), /^\d{8}$/)
     assert.equal(insertExecutions.length, 2)
+    assert.deepEqual(retryCountQueries, [
+      ['35222222222222222222222222222222222222222222'],
+      ['35333333333333333333333333333333333333333333']
+    ])
+    assert.deepEqual(retryCountUpdates, [
+      ['35222222222222222222222222222222222222222222']
+    ])
     assert.equal(notifications.length, 2)
     assert.match(
       notifications[0].body.text,
