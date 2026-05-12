@@ -82,13 +82,11 @@ export = async function runSincronizarNotasIntegrationTest(): Promise<void> {
 
     applyMercadoLivreTestEnv({
       GOOGLE_CHAT_WEBHOOK_URL: `http://127.0.0.1:${address.port}/webhook`,
-      MERCADOLIVRE_MAX_RETRY_COUNT: '5',
-      USA_ETIQUETA: 'true'
+      MERCADOLIVRE_MAX_RETRY_COUNT: '5'
     })
   } else {
     applyMercadoLivreTestEnv({
-      MERCADOLIVRE_MAX_RETRY_COUNT: '5',
-      USA_ETIQUETA: 'true'
+      MERCADOLIVRE_MAX_RETRY_COUNT: '5'
     })
   }
 
@@ -209,8 +207,7 @@ export = async function runSincronizarNotasIntegrationTest(): Promise<void> {
   try {
     await sincronizarNotasMercadoLivre()
 
-    assert.equal(nfcacheUpdates.length, 1)
-    assert.match(String(nfcacheUpdates[0][0]), /^\d{8}$/)
+    assert.equal(nfcacheUpdates.length, 0)
     assert.equal(insertExecutions.length, 2)
     assert.deepEqual(retryCountQueries, [
       ['35222222222222222222222222222222222222222222'],

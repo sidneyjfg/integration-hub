@@ -1,13 +1,10 @@
 import { z } from 'zod'
 
-const toBool = (v: unknown) => {
-  if (typeof v === 'boolean') return v
-  if (typeof v === 'number') return v === 1
-  if (typeof v === 'string') {
-    const s = v.trim().toLowerCase()
-    return s === '1' || s === 'true' || s === 'yes' || s === 'y'
-  }
-  return false
+const emptyToUndefined = (v: unknown) => {
+  if (typeof v !== 'string') return v
+
+  const value = v.trim()
+  return value === '' ? undefined : value
 }
 
 export const coreEnvSchema = z.object({
@@ -27,9 +24,9 @@ export const coreEnvSchema = z.object({
   CRON_PRODUTOS: z.string().optional(),
   CRON_NOTAS_ML: z.string().optional(),
   CRON_NOTAS_SFTP: z.string().optional(),
+  USA_ETIQUETA: z.preprocess(emptyToUndefined, z.string().optional()),
   GOOGLE_CHAT_WEBHOOK_URL: z.string().url(),
-  TZ: z.string().optional(),
-  USA_ETIQUETA: z.preprocess(toBool, z.boolean()).default(false)
+  TZ: z.string().optional()
 })
 
 export type CoreEnv = z.infer<typeof coreEnvSchema>

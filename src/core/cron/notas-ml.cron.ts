@@ -10,3 +10,11 @@ export async function runNotasMLCron() {
 
   await executarCronPorHub('mercadolivre', coreConfig, 'notas')
 }
+
+export async function runEtiquetaCron() {
+  const active = getActiveHubs()
+
+  if (!active.includes('mercadolivre')) return
+
+  await executarCronPorHub('mercadolivre', coreConfig, 'etiqueta')
+}

@@ -5,14 +5,12 @@ import {
   verificarECriarTabelaTmpNotas,
   buscarCredenciaisMercadoLivre,
   getRetryCountFfpreprocnf,
-  zerarRetryCountFfpreprocnf,
-  atualizarNfcacheEtiquetaDiaAtual
+  zerarRetryCountFfpreprocnf
 } from '../repositories/mercadolivre-notas.repository'
 import { notifyGoogleChat } from '../notifications/google-chat'
 import { buscarNotasMercadoLivre } from '../api/buscar-notas-mercadolivre'
 import { mercadolivreConfig } from '../env.schema'
 import { buildNotasNaoIntegradasCard } from '../notifications/build-notas-notification'
-import { coreConfig } from '../../../core/env.schema'
 
 async function processarRetryNotasNaoIntegradas(
   notasNaoIntegradas: Array<{ CHAVE_NFE?: string }>
@@ -64,13 +62,6 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
   console.log('[MERCADOLIVRE][SYNC] Iniciando sincronização de notas')
 
   try {
-    if (coreConfig.USA_ETIQUETA) {
-      const affectedRows = await atualizarNfcacheEtiquetaDiaAtual()
-      console.log('[MERCADOLIVRE][SYNC][ETIQUETA] nfcache atualizado', {
-        affectedRows
-      })
-    }
-
     console.log('[MERCADOLIVRE][SYNC] Verificando tabela tmp_notas')
     await verificarECriarTabelaTmpNotas()
     console.log('[MERCADOLIVRE][SYNC] Tabela tmp_notas OK')

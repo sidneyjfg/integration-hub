@@ -23,9 +23,10 @@ services:
       CRON_NOTAS_ML: "10 01 * * *"
       CRON_PRODUTOS: "23 23 * * *"
       CRON_PEDIDOS: "05 23 * * *"
+      # Cron da atualização de etiqueta; deixe vazio para não executar
+      USA_ETIQUETA:
       # 📣 Notificação global
       GOOGLE_CHAT_WEBHOOK_URL: 
-      USA_ETIQUETA:
 
       # ANYMARKET
       ANYMARKET_URL: https://api.anymarket.com.br
