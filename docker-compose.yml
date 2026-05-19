@@ -24,6 +24,8 @@ services:
       CRON_PRODUTOS: "23 23 * * *"
       CRON_PEDIDOS: "05 23 * * *"
       # Cron da atualização de etiqueta; deixe vazio para não executar
+      CRON_ETIQUETA:
+      # Legado: se usado, precisa conter uma expressão cron, não true/1
       USA_ETIQUETA:
       # 📣 Notificação global
       GOOGLE_CHAT_WEBHOOK_URL: 

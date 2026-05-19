@@ -352,14 +352,40 @@ function getHojeFormatoNerus(): string {
 
 export async function atualizarNfcacheEtiquetaDiaAtual(): Promise<number> {
   const hoje = getHojeFormatoNerus()
-  const sql = `
+  const selectSql = `
+      SELECT xano, ordno, storeno, date
+        FROM ${coreConfig.DB_NAME_DADOS}.nfcache
+      WHERE sync = 0
+        AND date = ?
+    `
+  const selectParams = [hoje]
+
+  console.log('[MERCADOLIVRE][ETIQUETA][DB] Select antes do update nfcache', {
+    sql: selectSql,
+    params: selectParams
+  })
+
+  const [rows] = await poolMain.query(selectSql, selectParams)
+
+  console.log('[MERCADOLIVRE][ETIQUETA][DB] Registros encontrados no nfcache', {
+    total: (rows as any[]).length,
+    registros: rows
+  })
+
+  const updateSql = `
       UPDATE ${coreConfig.DB_NAME_DADOS}.nfcache
         SET updatedAt = NOW()
       WHERE sync = 0
         AND date = ?
     `
+  const updateParams = [hoje]
 
-  const [res] = await poolMain.query(sql, [hoje])
+  console.log('[MERCADOLIVRE][ETIQUETA][DB] Update nfcache', {
+    sql: updateSql,
+    params: updateParams
+  })
+
+  const [res] = await poolMain.query(updateSql, updateParams)
 
   return (res as any).affectedRows ?? 0
 }
