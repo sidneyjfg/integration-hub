@@ -1,56 +1,61 @@
-import { z } from 'zod'
+import { z } from "zod";
 
 const toBool = (v: unknown) => {
-    if (typeof v === 'boolean') return v
-    if (typeof v === 'number') return v === 1
-    if (typeof v === 'string') {
-        const s = v.trim().toLowerCase()
-        return s === '1' || s === 'true' || s === 'yes' || s === 'y'
-    }
-    return false
-}
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v === 1;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    return s === "1" || s === "true" || s === "yes" || s === "y";
+  }
+  return false;
+};
 
 export const mercadolivreEnvSchema = z.object({
-    CLIENT_NAME: z.string().optional(),
-    
-    // SFTP Data
-    MERCADOLIVRE_SFTP_HOST: z.string().optional(),
-    MERCADOLIVRE_SFTP_PORT: z.string().optional(),
-    MERCADOLIVRE_SFTP_USER: z.string().optional(),
-    MERCADOLIVRE_SFTP_PASSWORD: z.string().optional(),
+  CLIENT_NAME: z.string().optional(),
 
-    // ⏱️ Período de busca
-    MERCADOLIVRE_DAYS_TO_FETCH: z.coerce.number().min(1),
-    MERCADOLIVRE_END_TO_FETCH: z.coerce.number().min(0).default(0),
-    MERCADOLIVRE_END_SFTP: z.coerce.number().min(0).default(0),
-    // ⚠️ Comportamentos opcionais
-    MERCADOLIVRE_DISPONIBILIZA_XML_DIVERGENTE: z.preprocess(toBool, z.boolean()).default(false),
+  // SFTP Data
+  MERCADOLIVRE_SFTP_HOST: z.string().optional(),
+  MERCADOLIVRE_SFTP_PORT: z.string().optional(),
+  MERCADOLIVRE_SFTP_USER: z.string().optional(),
+  MERCADOLIVRE_SFTP_PASSWORD: z.string().optional(),
 
-    MERCADOLIVRE_MAX_RETRY_COUNT: z.preprocess(
-        value => value === '' ? undefined : value,
-        z.coerce.number().min(0).optional()
-    ),
+  // ⏱️ Período de busca
+  MERCADOLIVRE_DAYS_TO_FETCH: z.coerce.number().min(1),
+  MERCADOLIVRE_END_TO_FETCH: z.coerce.number().min(0).default(0),
+  MERCADOLIVRE_END_SFTP: z.coerce.number().min(0).default(0),
+  // ⚠️ Comportamentos opcionais
+  MERCADOLIVRE_DISPONIBILIZA_XML_DIVERGENTE: z
+    .preprocess(toBool, z.boolean())
+    .default(false),
 
-    MERCADOLIVRE_SFTP_ENABLED: z.preprocess(toBool, z.boolean()).default(false),
-    MERCADOLIVRE_SFTP_DIR: z.string().default(''),
-    MERCADOLIVRE_USE_LEDGER: z.preprocess(toBool, z.boolean()).default(false),
-    // 📁 Filtros SFTP
-    MERCADOLIVRE_SFTP_ORGANIZE_BY_DATE: z
-        .preprocess(toBool, z.boolean())
-        .default(false),
-    MERCADOLIVRE_SFTP_IGNORE_END_FILE: z.string().optional().default(''),
-    MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA: z.string().optional().default(''),
-    MERCADOLIVRE_IGNORE_SERIE: z.string().optional().default(''),
-    MERCADOLIVRE_IS_VONDER: z.preprocess(toBool, z.boolean()).default(false),
-    MERCADOLIVRE_SFTP_UID: z.coerce.number().optional(),
-    MERCADOLIVRE_SFTP_GID: z.coerce.number().optional(),
-    // 📣 Notificação
-    GOOGLE_CHAT_WEBHOOK_URL:
-        z.string().url().optional().or(z.literal(''))
-})
+  MERCADOLIVRE_MAX_RETRY_COUNT: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.coerce.number().min(0).optional(),
+  ),
 
-export type MercadoLivreConfig =
-    z.infer<typeof mercadolivreEnvSchema>
+  MERCADOLIVRE_SFTP_ENABLED: z.preprocess(toBool, z.boolean()).default(false),
+  MERCADOLIVRE_SFTP_DIR: z.string().default(""),
+  MERCADOLIVRE_USE_LEDGER: z.preprocess(toBool, z.boolean()).default(false),
+  // 📁 Filtros SFTP
+  MERCADOLIVRE_SFTP_ORGANIZE_BY_DATE: z
+    .preprocess(toBool, z.boolean())
+    .default(false),
+  MERCADOLIVRE_SFTP_IGNORE_END_FILE: z.string().optional().default(""),
+  MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA: z.string().optional().default(""),
+  MERCADOLIVRE_IGNORE_SERIE: z.string().optional().default(""),
+  MERCADOLIVRE_IS_VONDER: z.preprocess(toBool, z.boolean()).default(false),
+  MERCADOLIVRE_SFTP_UID: z.coerce.number().optional(),
+  MERCADOLIVRE_SFTP_GID: z.coerce.number().optional(),
+  // 📣 Notificação
+  GOOGLE_CHAT_WEBHOOK_URL: z.string().url().optional().or(z.literal("")),
+  GOOGLE_CHAT_WEBHOOK_URL_WARNING: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal("")),
+  GOOGLE_CHAT_WEBHOOK_URL_ERROR: z.string().url().optional().or(z.literal("")),
+});
 
-export const mercadolivreConfig =
-    mercadolivreEnvSchema.parse(process.env)
+export type MercadoLivreConfig = z.infer<typeof mercadolivreEnvSchema>;
+
+export const mercadolivreConfig = mercadolivreEnvSchema.parse(process.env);

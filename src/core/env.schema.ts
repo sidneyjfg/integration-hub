@@ -1,11 +1,11 @@
-import { z } from 'zod'
+import { z } from "zod";
 
 const emptyToUndefined = (v: unknown) => {
-  if (typeof v !== 'string') return v
+  if (typeof v !== "string") return v;
 
-  const value = v.trim()
-  return value === '' ? undefined : value
-}
+  const value = v.trim();
+  return value === "" ? undefined : value;
+};
 
 export const coreEnvSchema = z.object({
   PORT: z.coerce.number().default(3000),
@@ -19,19 +19,21 @@ export const coreEnvSchema = z.object({
   DB_NAME_MONITORAMENTO: z.string(),
 
   ACTIVE_INTEGRATIONS: z.string(),
-  STORENOS: z.string().default('1'),
+  STORENOS: z.string().default("1"),
   CRON_PEDIDOS: z.string().optional(),
   CRON_PRODUTOS: z.string().optional(),
   CRON_NOTAS_ML: z.string().optional(),
   CRON_NOTAS_SFTP: z.string().optional(),
   USA_ETIQUETA: z.preprocess(emptyToUndefined, z.string().optional()),
   GOOGLE_CHAT_WEBHOOK_URL: z.string().url(),
-  TZ: z.string().optional()
-})
+  GOOGLE_CHAT_WEBHOOK_URL_ERROR: z.string().url(),
+  GOOGLE_CHAT_WEBHOOK_URL_WARNING: z.string().url(),
+  TZ: z.string().optional(),
+});
 
-export type CoreEnv = z.infer<typeof coreEnvSchema>
+export type CoreEnv = z.infer<typeof coreEnvSchema>;
 
 export function validateCoreEnv(): CoreEnv {
-  return coreEnvSchema.parse(process.env)
+  return coreEnvSchema.parse(process.env);
 }
-export const coreConfig: CoreEnv = coreEnvSchema.parse(process.env)
+export const coreConfig: CoreEnv = coreEnvSchema.parse(process.env);

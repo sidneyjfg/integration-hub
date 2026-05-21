@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 
 services:
   integrations-hub:
@@ -28,7 +28,9 @@ services:
       # Legado: se usado, precisa conter uma expressão cron, não true/1
       USA_ETIQUETA:
       # 📣 Notificação global
-      GOOGLE_CHAT_WEBHOOK_URL: 
+      GOOGLE_CHAT_WEBHOOK_URL:
+      GOOGLE_CHAT_WEBHOOK_URL_WARNING:
+      GOOGLE_CHAT_WEBHOOK_URL_ERROR:
 
       # ANYMARKET
       ANYMARKET_URL: https://api.anymarket.com.br
@@ -54,9 +56,9 @@ services:
       MERCADOLIVRE_REFRESH_TOKEN:
 
       MERCADOLIVRE_CLIENTE_ID:
-      MERCADOLIVRE_STORENOS: 
+      MERCADOLIVRE_STORENOS:
 
-      MERCADOLIVRE_DAYS_TO_FETCH: 
+      MERCADOLIVRE_DAYS_TO_FETCH:
       MERCADOLIVRE_END_TO_FETCH:
       MERCADOLIVRE_END_SFTP:
       MERCADOLIVRE_IGNORE_SERIE:
@@ -88,8 +90,7 @@ services:
       # TRAYCORP
       TRAY_URL: https://api.tray.com.br
       TRAY_TOKEN: ""
-      
-      
+
       PORT: 3000
       TZ: America/Sao_Paulo
     ports:

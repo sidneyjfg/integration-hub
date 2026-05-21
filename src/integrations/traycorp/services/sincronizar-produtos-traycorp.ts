@@ -1,4 +1,8 @@
-import { notifyGoogleChat } from "../../anymarket/notifications/google-chat";
+import {
+  notifyGoogleChat,
+  notifyGoogleChatError,
+  notifyGoogleChatWarning,
+} from "../../anymarket/notifications/google-chat";
 import { salvarProdutosTempTraycorp } from "../repositories/produtos.repository";
 import { buscarProdutosTraycorp } from "./buscar-produto-traycorp";
 import { produtoTraycorpEhValido } from "./validar-produto-traycorp";
@@ -24,12 +28,12 @@ export async function sincronizarProdutosTraycorp() {
   if (validos.length === 0) {
     console.log("[TRAYCORP][SYNC] Nenhum produto válido encontrado");
 
-    await notifyGoogleChat(
+    await notifyGoogleChatWarning(
       `⚠️ *TrayCorp – Sincronização de Produtos*\n\n` +
-      `Total buscados: ${totalBuscados}\n` +
-      `Produtos válidos: 0\n` +
-      `Produtos inválidos: ${invalidos}\n\n` +
-      `Nenhum produto foi inserido.`
+        `Total buscados: ${totalBuscados}\n` +
+        `Produtos válidos: 0\n` +
+        `Produtos inválidos: ${invalidos}\n\n` +
+        `Nenhum produto foi inserido.`,
     );
 
     return { totalBuscados, inseridos: 0, invalidos };
@@ -45,10 +49,10 @@ export async function sincronizarProdutosTraycorp() {
 
   await notifyGoogleChat(
     `📦 *TrayCorp – Sincronização de Produtos*\n\n` +
-    `Total buscados: ${totalBuscados}\n` +
-    `Produtos válidos: ${validos.length}\n` +
-    `Produtos inseridos: ${inseridos}\n` +
-    `Produtos inválidos (nao foram inseridos): ${invalidos}`
+      `Total buscados: ${totalBuscados}\n` +
+      `Produtos válidos: ${validos.length}\n` +
+      `Produtos inseridos: ${inseridos}\n` +
+      `Produtos inválidos (nao foram inseridos): ${invalidos}`,
   );
 
   return { totalBuscados, inseridos, invalidos };

@@ -1,204 +1,202 @@
-import path from 'path'
+import path from "path";
 
-import { buscarNotasMercadoLivre } from '../api/buscar-notas-mercadolivre'
-import { filtrarPorIgnoreEndFile, getAllXmlFiles } from '../utils'
-import { notifyGoogleChat } from '../notifications/google-chat'
-import { buildMercadoLivreSftpNotification } from '../notifications/build-sftp-notification'
-import { mercadolivreConfig } from '../env.schema'
+import { buscarNotasMercadoLivre } from "../api/buscar-notas-mercadolivre";
+import { filtrarPorIgnoreEndFile, getAllXmlFiles } from "../utils";
+import {
+  notifyGoogleChat,
+  notifyGoogleChatError,
+  notifyGoogleChatWarning,
+} from "../notifications/google-chat";
+import { buildMercadoLivreSftpNotification } from "../notifications/build-sftp-notification";
+import { mercadolivreConfig } from "../env.schema";
 
-import { resolverModoEnvio } from './resolve-modo-envio'
-import { executarLocalSimples } from '../sftp/modos/local-simples'
-import { executarLocalLedger } from '../sftp/modos/local-ledger'
-import { executarSftpSimples } from '../sftp/modos/sftp-simples'
-import { executarSftpLedger } from '../sftp/modos/sftp-ledger'
-import { executarSftpVonder } from '../sftp/modos/sftp-vonder'
-import { ResultadoEnvio } from '../../../shared/types'
-import { buscarCredenciaisMercadoLivre } from '../repositories/mercadolivre-notas.repository'
+import { resolverModoEnvio } from "./resolve-modo-envio";
+import { executarLocalSimples } from "../sftp/modos/local-simples";
+import { executarLocalLedger } from "../sftp/modos/local-ledger";
+import { executarSftpSimples } from "../sftp/modos/sftp-simples";
+import { executarSftpLedger } from "../sftp/modos/sftp-ledger";
+import { executarSftpVonder } from "../sftp/modos/sftp-vonder";
+import { ResultadoEnvio } from "../../../shared/types";
+import { buscarCredenciaisMercadoLivre } from "../repositories/mercadolivre-notas.repository";
 
-function classificarArquivoVonder(file: string): 'IN' | 'CTE' | 'IN_EVENTOS' {
-  const nome = file.toLowerCase()
+function classificarArquivoVonder(file: string): "IN" | "CTE" | "IN_EVENTOS" {
+  const nome = file.toLowerCase();
 
-  if (nome.includes('evento') || nome.includes('proceventonfe')) {
-    return 'IN_EVENTOS'
+  if (nome.includes("evento") || nome.includes("proceventonfe")) {
+    return "IN_EVENTOS";
   }
 
   if (
-    nome.includes('ct_e') ||
-    nome.includes('ct-e') ||
-    nome.includes('cte') ||
-    nome.includes('proccte')
+    nome.includes("ct_e") ||
+    nome.includes("ct-e") ||
+    nome.includes("cte") ||
+    nome.includes("proccte")
   ) {
-    return 'CTE'
+    return "CTE";
   }
 
-  return 'IN'
+  return "IN";
 }
 
 export async function sincronizarSFTPMercadoLivre(): Promise<void> {
-  console.log('[MERCADOLIVRE][SFTP] Iniciando sincronização SFTP')
+  console.log("[MERCADOLIVRE][SFTP] Iniciando sincronização SFTP");
 
-  const modo = resolverModoEnvio()
-  console.log('[MERCADOLIVRE][SFTP] Modo selecionado:', modo)
+  const modo = resolverModoEnvio();
+  console.log("[MERCADOLIVRE][SFTP] Modo selecionado:", modo);
 
-  const isVonder = modo === 'SFTP_VONDER_LEDGER'
-  const isSftpMode = modo.startsWith('SFTP')
+  const isVonder = modo === "SFTP_VONDER_LEDGER";
+  const isSftpMode = modo.startsWith("SFTP");
 
-  const contas = await buscarCredenciaisMercadoLivre()
+  const contas = await buscarCredenciaisMercadoLivre();
 
   if (!contas.length) {
-    throw new Error('[MERCADOLIVRE][SFTP] Nenhuma credencial válida encontrada no banco')
+    throw new Error(
+      "[MERCADOLIVRE][SFTP] Nenhuma credencial válida encontrada no banco",
+    );
   }
 
-
   for (const conta of contas) {
-    const clienteId = conta.clienteId
-    const accessToken = conta.accessToken
-    const refreshToken = conta.refreshToken
-    const clientId = conta.clientId
-    const clientSecret = conta.clientSecret
+    const clienteId = conta.clienteId;
+    const accessToken = conta.accessToken;
+    const refreshToken = conta.refreshToken;
+    const clientId = conta.clientId;
+    const clientSecret = conta.clientSecret;
 
-
-    console.log('[MERCADOLIVRE][SFTP] Processando cliente', { clienteId })
+    console.log("[MERCADOLIVRE][SFTP] Processando cliente", { clienteId });
 
     try {
-      const { notas, startDate, endDate } =
-        await buscarNotasMercadoLivre({
-          clienteId,
-          clientId,
-          clientSecret,
-          accessToken,
-          refreshToken,
-          endOverride: mercadolivreConfig.MERCADOLIVRE_END_SFTP,
-          sftpMode: true
-        })
+      const { notas, startDate, endDate } = await buscarNotasMercadoLivre({
+        clienteId,
+        clientId,
+        clientSecret,
+        accessToken,
+        refreshToken,
+        endOverride: mercadolivreConfig.MERCADOLIVRE_END_SFTP,
+        sftpMode: true,
+      });
 
       const ignoreTipos =
-        mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA
-          ?.split(',')
-          .map(s => s.trim()) ?? []
+        mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA?.split(",").map(
+          (s) => s.trim(),
+        ) ?? [];
 
       const notasFiltradas = notas.filter(
-        n => !ignoreTipos.includes(n.tipoNota)
-      )
+        (n) => !ignoreTipos.includes(n.tipoNota),
+      );
 
       // 📄 NF-e vindas do extract
       let files = notasFiltradas
-        .map(n => n.filePath)
-        .filter(Boolean) as string[]
+        .map((n) => n.filePath)
+        .filter(Boolean) as string[];
 
       // 📦 VONDER → inclui TODOS os XML (CTE + EVENTOS)
       if (isSftpMode) {
-        const extractRoot = path.resolve('./notas/xml')
-        const allXmlFiles = await getAllXmlFiles(extractRoot)
+        const extractRoot = path.resolve("./notas/xml");
+        const allXmlFiles = await getAllXmlFiles(extractRoot);
 
-        const extras = allXmlFiles.filter(f => !files.includes(f))
-        files.push(...extras)
+        const extras = allXmlFiles.filter((f) => !files.includes(f));
+        files.push(...extras);
       }
 
       files = filtrarPorIgnoreEndFile(
         files,
-        mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE
-      )
+        mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE,
+      );
 
       if (!files.length) {
-        console.log('[MERCADOLIVRE][SFTP] Nenhum XML encontrado', { clienteId })
-        continue
+        console.log("[MERCADOLIVRE][SFTP] Nenhum XML encontrado", {
+          clienteId,
+        });
+        continue;
       }
 
-      let resultadoEnvio: ResultadoEnvio = { arquivos: [], total: 0 }
+      let resultadoEnvio: ResultadoEnvio = { arquivos: [], total: 0 };
 
       switch (modo) {
-        case 'LOCAL_SIMPLES':
-          resultadoEnvio = await executarLocalSimples(files)
-          break
+        case "LOCAL_SIMPLES":
+          resultadoEnvio = await executarLocalSimples(files);
+          break;
 
-        case 'LOCAL_LEDGER':
-          resultadoEnvio = await executarLocalLedger(files)
-          break
+        case "LOCAL_LEDGER":
+          resultadoEnvio = await executarLocalLedger(files);
+          break;
 
-        case 'SFTP_SIMPLES':
-          await executarSftpSimples(files)
-          break
+        case "SFTP_SIMPLES":
+          await executarSftpSimples(files);
+          break;
 
-        case 'SFTP_LEDGER':
-          resultadoEnvio = await executarSftpLedger(files)
-          break
+        case "SFTP_LEDGER":
+          resultadoEnvio = await executarSftpLedger(files);
+          break;
 
-        case 'SFTP_VONDER_LEDGER':
-          resultadoEnvio = await executarSftpVonder(files)
-          break
+        case "SFTP_VONDER_LEDGER":
+          resultadoEnvio = await executarSftpVonder(files);
+          break;
       }
 
       // ✅ A PARTIR DAQUI JÁ SABEMOS O QUE FOI ENVIADO
 
-      const arquivosEnviadosSet = new Set(resultadoEnvio.arquivos)
+      const arquivosEnviadosSet = new Set(resultadoEnvio.arquivos);
 
-      const notasEnviadas = notasFiltradas.filter(n =>
-        n.filePath &&
-        arquivosEnviadosSet.has(path.basename(n.filePath))
-      )
+      const notasEnviadas = notasFiltradas.filter(
+        (n) => n.filePath && arquivosEnviadosSet.has(path.basename(n.filePath)),
+      );
 
       // 🔎 RESUMO REAL POR TIPO (somente VONDER)
-      let resumoPorTipo: Record<string, number> | undefined
+      let resumoPorTipo: Record<string, number> | undefined;
 
-      if (modo === 'SFTP_VONDER_LEDGER') {
+      if (modo === "SFTP_VONDER_LEDGER") {
         resumoPorTipo = resultadoEnvio.arquivos.reduce<Record<string, number>>(
           (acc, nome) => {
-            const tipo = classificarArquivoVonder(nome)
-            acc[tipo] = (acc[tipo] || 0) + 1
-            return acc
+            const tipo = classificarArquivoVonder(nome);
+            acc[tipo] = (acc[tipo] || 0) + 1;
+            return acc;
           },
-          {}
-        )
+          {},
+        );
       }
 
       const temFiltro =
         Boolean(
           mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA &&
-          mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA
-            .split(',')
-            .map(s => s.trim())
-            .filter(Boolean).length > 0
+          mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_TIPO_NOTA.split(",")
+            .map((s) => s.trim())
+            .filter(Boolean).length > 0,
         ) ||
         Boolean(
           mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE &&
-          mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE
-            .split(',')
-            .map(s => s.trim())
-            .filter(Boolean).length > 0
-        )
+          mercadolivreConfig.MERCADOLIVRE_SFTP_IGNORE_END_FILE.split(",")
+            .map((s) => s.trim())
+            .filter(Boolean).length > 0,
+        );
 
       const notification = await buildMercadoLivreSftpNotification({
         clienteId,
         clientName: mercadolivreConfig.CLIENT_NAME ?? clienteId,
         modo,
-        notas: modo === 'SFTP_VONDER_LEDGER' ? [] : notasEnviadas,
+        notas: modo === "SFTP_VONDER_LEDGER" ? [] : notasEnviadas,
         totalEncontradas:
-          modo === 'LOCAL_LEDGER'
-            ? notasFiltradas.length
-            : files.length,
+          modo === "LOCAL_LEDGER" ? notasFiltradas.length : files.length,
         totalEnviadas: resultadoEnvio.arquivos.length,
         startDate,
         endDate,
         targetDir: mercadolivreConfig.MERCADOLIVRE_SFTP_DIR,
         resumoPorTipo,
-        temFiltro
-      })
+        temFiltro,
+      });
 
-      await notifyGoogleChat(notification)
-
-
+      await notifyGoogleChat(notification);
     } catch (err) {
-      console.error('[MERCADOLIVRE][SFTP] Erro ao processar cliente', {
+      console.error("[MERCADOLIVRE][SFTP] Erro ao processar cliente", {
         clienteId,
-        err
-      })
+        err,
+      });
 
-      await notifyGoogleChat(
-        `❌ Erro no SFTP Mercado Livre • Cliente ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}`
-      )
+      await notifyGoogleChatError(
+        `❌ Erro no SFTP Mercado Livre • Cliente ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}`,
+      );
     }
   }
 
-  console.log('[MERCADOLIVRE][SFTP] Sincronização SFTP finalizada')
+  console.log("[MERCADOLIVRE][SFTP] Sincronização SFTP finalizada");
 }
