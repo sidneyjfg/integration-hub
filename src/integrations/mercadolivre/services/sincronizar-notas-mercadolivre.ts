@@ -152,7 +152,8 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
           );
 
           await notifyGoogleChatWarning(card);
-        } else {
+        }
+        {
           await notifyGoogleChat(
             `✅ Todas as notas do Mercado Livre foram integradas no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}).`,
           );
