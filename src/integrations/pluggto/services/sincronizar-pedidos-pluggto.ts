@@ -1,137 +1,146 @@
 import {
-    buscarPedidosPluggto,
-    getUltimoResumoBuscaPedidosPluggto
-} from '../api/buscar-pedidos-pluggto'
-import { reenviarPedidoPluggto } from './reenviar-pedidos-pluggto'
+  buscarPedidosPluggto,
+  getUltimoResumoBuscaPedidosPluggto,
+} from "../api/buscar-pedidos-pluggto";
+import { reenviarPedidoPluggto } from "./reenviar-pedidos-pluggto";
 import {
-    buscarPedidosNaoIntegrados,
-    salvarPedidosTempPluggto
-} from '../repositories/pedidos.repository'
-import { pluggtoConfig } from '../env.schema'
-import { formatarLinhaPedido, notifyGoogleChat } from '../notifications/google-chat'
+  buscarPedidosNaoIntegrados,
+  salvarPedidosTempPluggto,
+} from "../repositories/pedidos.repository";
+import { pluggtoConfig } from "../env.schema";
+import {
+  formatarLinhaPedido,
+  notifyGoogleChat,
+  notifyGoogleChatError,
+  notifyGoogleChatWarning,
+} from "../notifications/google-chat";
 
 export async function sincronizarPedidosPluggto() {
-    console.log('[PLUGGTO][SYNC] Iniciando pedidos')
+  console.log("[PLUGGTO][SYNC] Iniciando pedidos");
 
-    const pedidos = await buscarPedidosPluggto()
-    const resumoFiltro = formatarResumoFiltroStatus(getUltimoResumoBuscaPedidosPluggto())
+  const pedidos = await buscarPedidosPluggto();
+  const resumoFiltro = formatarResumoFiltroStatus(
+    getUltimoResumoBuscaPedidosPluggto(),
+  );
 
-    if (pedidos.length === 0) {
-        console.log('[PLUGGTO][SYNC] Nenhum pedido encontrado')
-        await notifyGoogleChat(
-            [
-                '✅ Nenhum pedido encontrado na Pluggto',
-                '',
-                ...resumoFiltro
-            ].join('\n')
-        )
-        return
+  if (pedidos.length === 0) {
+    console.log("[PLUGGTO][SYNC] Nenhum pedido encontrado");
+    await notifyGoogleChat(
+      ["✅ Nenhum pedido encontrado na Pluggto", "", ...resumoFiltro].join(
+        "\n",
+      ),
+    );
+    return;
+  }
+
+  await salvarPedidosTempPluggto(pedidos);
+
+  const naoIntegrados = await buscarPedidosNaoIntegrados();
+
+  if (!naoIntegrados.length) {
+    console.log("[PLUGGTO][SYNC] Nenhum pedido pendente de integração");
+    await notifyGoogleChat(
+      "✅ Todos os pedidos Pluggto foram integrados no Nérus",
+    );
+    return;
+  }
+
+  // 🚫 Reenvio desativado se URL não existir
+  if (!pluggtoConfig.NERUS_RECEIVE_ORDER_URL) {
+    console.warn(
+      "[PLUGGTO][SYNC] Reenvio desativado — NERUS_RECEIVE_ORDER_URL ausente",
+    );
+
+    const linhas = naoIntegrados.map(formatarLinhaPedido);
+
+    await notifyGoogleChatWarning(
+      [
+        "⚠️ *Pedidos Pluggto não integrados encontrados*",
+        "",
+        `Total: ${naoIntegrados.length}`,
+        "",
+        ...resumoFiltro,
+        "",
+        ...linhas,
+      ].join("\n"),
+    );
+
+    return;
+  }
+
+  // =========================
+  // 🔁 Reenvio normal
+  // =========================
+  const erros: Array<{ ordnoweb: string; error: string }> = [];
+  const reenviados: typeof naoIntegrados = [];
+
+  for (const pedido of naoIntegrados) {
+    try {
+      console.log(`[PLUGGTO][REENVIO] Reenviando pedido ${pedido.ordnoweb}`);
+      await reenviarPedidoPluggto(pedido.ordnoweb);
+
+      reenviados.push(pedido); // 👈 sucesso
+    } catch (err: any) {
+      const msg = err?.message || String(err);
+      console.error(
+        `[PLUGGTO][REENVIO] Falha no pedido ${pedido.ordnoweb}:`,
+        msg,
+      );
+      erros.push({ ordnoweb: pedido.ordnoweb, error: msg });
     }
+  }
 
-    await salvarPedidosTempPluggto(pedidos)
+  const mensagens: string[] = [];
 
-    const naoIntegrados = await buscarPedidosNaoIntegrados()
+  if (naoIntegrados.length) {
+    mensagens.push(
+      "⚠️ *Pedidos Pluggto não integrados*",
+      "",
+      `Total: ${naoIntegrados.length}`,
+      "",
+      ...resumoFiltro,
+      "",
+      ...naoIntegrados.map(formatarLinhaPedido),
+      "",
+    );
 
-    if (!naoIntegrados.length) {
-        console.log('[PLUGGTO][SYNC] Nenhum pedido pendente de integração')
-        await notifyGoogleChat('✅ Todos os pedidos Pluggto foram integrados no Nérus')
-        return
-    }
+    await notifyGoogleChatWarning(mensagens.join("\n"));
+  }
 
-    // 🚫 Reenvio desativado se URL não existir
-    if (!pluggtoConfig.NERUS_RECEIVE_ORDER_URL) {
-        console.warn('[PLUGGTO][SYNC] Reenvio desativado — NERUS_RECEIVE_ORDER_URL ausente')
+  if (reenviados.length) {
+    mensagens.push(
+      "🔁 *Pedidos reenviados com sucesso*",
+      "",
+      `Total: ${reenviados.length}`,
+      "",
+      ...reenviados.map(formatarLinhaPedido),
+      "",
+    );
 
-        const linhas = naoIntegrados.map(formatarLinhaPedido)
+    await notifyGoogleChat(mensagens.join("\n"));
+  }
 
-        await notifyGoogleChat(
-            [
-                '⚠️ *Pedidos Pluggto não integrados encontrados*',
-                '',
-                `Total: ${naoIntegrados.length}`,
-                '',
-                ...resumoFiltro,
-                '',
-                ...linhas
-            ].join('\n')
-        )
+  if (erros.length) {
+    mensagens.push(
+      "❌ *Falha ao reenviar pedidos*",
+      "",
+      `<pre>${JSON.stringify(erros, null, 2)}</pre>`,
+    );
 
-        return
-    }
-
-    // =========================
-    // 🔁 Reenvio normal
-    // =========================
-    const erros: Array<{ ordnoweb: string; error: string }> = []
-    const reenviados: typeof naoIntegrados = []
-
-    for (const pedido of naoIntegrados) {
-        try {
-            console.log(`[PLUGGTO][REENVIO] Reenviando pedido ${pedido.ordnoweb}`)
-            await reenviarPedidoPluggto(pedido.ordnoweb)
-
-            reenviados.push(pedido) // 👈 sucesso
-        } catch (err: any) {
-            const msg = err?.message || String(err)
-            console.error(
-                `[PLUGGTO][REENVIO] Falha no pedido ${pedido.ordnoweb}:`,
-                msg
-            )
-            erros.push({ ordnoweb: pedido.ordnoweb, error: msg })
-        }
-    }
-
-    const mensagens: string[] = []
-
-    if (naoIntegrados.length) {
-        mensagens.push(
-            '⚠️ *Pedidos Pluggto não integrados*',
-            '',
-            `Total: ${naoIntegrados.length}`,
-            '',
-            ...resumoFiltro,
-            '',
-            ...naoIntegrados.map(formatarLinhaPedido),
-            ''
-        )
-    }
-
-    if (reenviados.length) {
-        mensagens.push(
-            '🔁 *Pedidos reenviados com sucesso*',
-            '',
-            `Total: ${reenviados.length}`,
-            '',
-            ...reenviados.map(formatarLinhaPedido),
-            ''
-        )
-    }
-
-    if (erros.length) {
-        mensagens.push(
-            '❌ *Falha ao reenviar pedidos*',
-            '',
-            `<pre>${JSON.stringify(erros, null, 2)}</pre>`
-        )
-    }
-
-    if (mensagens.length) {
-        await notifyGoogleChat(mensagens.join('\n'))
-    }
-
+    await notifyGoogleChatError(mensagens.join("\n"));
+  }
 }
 
 function formatarResumoFiltroStatus(resumo: {
-    ignorados: number
-    statusIgnorados: string[]
+  ignorados: number;
+  statusIgnorados: string[];
 }) {
-    if (!resumo.statusIgnorados.length) {
-        return ['Filtro PLUGGTO_NO_LOOK_STATUS_TYPES: nenhum status configurado']
-    }
+  if (!resumo.statusIgnorados.length) {
+    return ["Filtro PLUGGTO_NO_LOOK_STATUS_TYPES: nenhum status configurado"];
+  }
 
-    return [
-        `Filtro PLUGGTO_NO_LOOK_STATUS_TYPES: ${resumo.statusIgnorados.join(', ')}`,
-        `Pedidos ignorados pelo filtro: ${resumo.ignorados}`
-    ]
+  return [
+    `Filtro PLUGGTO_NO_LOOK_STATUS_TYPES: ${resumo.statusIgnorados.join(", ")}`,
+    `Pedidos ignorados pelo filtro: ${resumo.ignorados}`,
+  ];
 }
-

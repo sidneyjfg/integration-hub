@@ -1,18 +1,18 @@
-import axios from 'axios'
-import { mercadolivreConfig } from '../env.schema'
+import axios from "axios";
+import { mercadolivreConfig } from "../env.schema";
 
 type GoogleChatMessage =
   | string
   | {
-      cards: unknown[]
+      cards: unknown[];
     }
   | {
-      cardsV2: unknown[]
+      cardsV2: unknown[];
     }
   | {
-      header?: unknown
-      sections?: unknown[]
-    }
+      header?: unknown;
+      sections?: unknown[];
+    };
 
 /**
  * 📣 Envia notificação para Google Chat
@@ -20,42 +20,115 @@ type GoogleChatMessage =
  * - objeto → card
  */
 export async function notifyGoogleChat(
-  message: GoogleChatMessage
+  message: GoogleChatMessage,
 ): Promise<void> {
-  const webhookUrl = mercadolivreConfig.GOOGLE_CHAT_WEBHOOK_URL
+  const webhookUrl = mercadolivreConfig.GOOGLE_CHAT_WEBHOOK_URL;
 
   if (!webhookUrl) {
     console.warn(
-      '[MERCADOLIVRE][NOTIFY] GOOGLE_CHAT_WEBHOOK_URL não configurada'
-    )
-    return
+      "[MERCADOLIVRE][NOTIFY] GOOGLE_CHAT_WEBHOOK_URL não configurada",
+    );
+    return;
   }
 
   const body =
-    typeof message === 'string'
+    typeof message === "string"
       ? { text: message }
-      : 'cards' in message
+      : "cards" in message
         ? message
-        : 'cardsV2' in message
+        : "cardsV2" in message
           ? message
-        : { cards: [message] }
+          : { cards: [message] };
 
   try {
     await axios.post(webhookUrl, body, {
       headers: {
-        'Content-Type': 'application/json'
-      }
-    })
+        "Content-Type": "application/json",
+      },
+    });
 
-    console.log('[MERCADOLIVRE][NOTIFY] Notificação enviada')
+    console.log("[MERCADOLIVRE][NOTIFY] Notificação enviada");
   } catch (error: any) {
-    console.error(
-      '[MERCADOLIVRE][NOTIFY] Erro ao enviar notificação',
-      {
-        message: error?.message,
-        status: error?.response?.status,
-        data: error?.response?.data
-      }
-    )
+    console.error("[MERCADOLIVRE][NOTIFY] Erro ao enviar notificação", {
+      message: error?.message,
+      status: error?.response?.status,
+      data: error?.response?.data,
+    });
+  }
+}
+
+export async function notifyGoogleChatWarning(
+  message: GoogleChatMessage,
+): Promise<void> {
+  const webhookUrl = mercadolivreConfig.GOOGLE_CHAT_WEBHOOK_URL_WARNING;
+
+  if (!webhookUrl) {
+    console.warn(
+      "[MERCADOLIVRE][NOTIFY] GOOGLE_CHAT_WEBHOOK_URL não configurada",
+    );
+    return;
+  }
+
+  const body =
+    typeof message === "string"
+      ? { text: message }
+      : "cards" in message
+        ? message
+        : "cardsV2" in message
+          ? message
+          : { cards: [message] };
+
+  try {
+    await axios.post(webhookUrl, body, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("[MERCADOLIVRE][NOTIFY] Notificação enviada");
+  } catch (error: any) {
+    console.error("[MERCADOLIVRE][NOTIFY] Erro ao enviar notificação", {
+      message: error?.message,
+      status: error?.response?.status,
+      data: error?.response?.data,
+    });
+  }
+}
+
+export async function notifyGoogleChatError(
+  message: GoogleChatMessage,
+): Promise<void> {
+  const webhookUrl = mercadolivreConfig.GOOGLE_CHAT_WEBHOOK_URL_ERROR;
+
+  if (!webhookUrl) {
+    console.warn(
+      "[MERCADOLIVRE][NOTIFY] GOOGLE_CHAT_WEBHOOK_URL não configurada",
+    );
+    return;
+  }
+
+  const body =
+    typeof message === "string"
+      ? { text: message }
+      : "cards" in message
+        ? message
+        : "cardsV2" in message
+          ? message
+          : { cards: [message] };
+
+  try {
+    await axios.post(webhookUrl, body, {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    console.log("[MERCADOLIVRE][NOTIFY] Notificação enviada");
+  } catch (error: any) {
+    console.error("[MERCADOLIVRE][NOTIFY] Erro ao enviar notificação", {
+      message: error?.message,
+      status: error?.response?.status,
+      data: error?.response?.data,
+    });
   }
 }
