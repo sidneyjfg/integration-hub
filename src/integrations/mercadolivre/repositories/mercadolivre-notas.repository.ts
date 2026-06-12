@@ -2,7 +2,7 @@ import { poolMonitoramento, poolMain } from '../../../core/db'
 import { coreConfig } from '../../../core/env.schema'
 import { mercadolivreConfig } from '../env.schema'
 import { MercadoLivreNotaBody } from '../../../shared/types/mercadolivre'
-import { isSerieIgnorada } from '../utils'
+import { calculateDate, isSerieIgnorada } from '../utils'
 
 export type MercadoLivreCredential = {
   clienteId: string            // user_id
@@ -341,24 +341,24 @@ export async function zerarRetryCountFfpreprocnf(params: {
   return (res as any).affectedRows ?? 0
 }
 
-function getHojeFormatoNerus(): string {
-  const date = new Date()
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-
-  return `${year}${month}${day}`
-}
-
 export async function atualizarNfcacheEtiquetaDiaAtual(): Promise<number> {
-  const hoje = getHojeFormatoNerus()
+  const daysToFetch = mercadolivreConfig.ETIQUE_DAYS_TO_FETCH
+  const dataInicial = calculateDate(daysToFetch - 1)
+  const hoje = calculateDate(0)
+  const dateFilter = daysToFetch > 1
+    ? 'date BETWEEN ? AND ?'
+    : 'date = ?'
+  const dateParams = daysToFetch > 1
+    ? [dataInicial, hoje]
+    : [hoje]
+
   const selectSql = `
       SELECT xano, ordno, storeno, date
         FROM ${coreConfig.DB_NAME_DADOS}.nfcache
       WHERE sync = 0
-        AND date = ?
+        AND ${dateFilter}
     `
-  const selectParams = [hoje]
+  const selectParams = dateParams
 
   console.log('[MERCADOLIVRE][ETIQUETA][DB] Select antes do update nfcache', {
     sql: selectSql,
@@ -376,9 +376,9 @@ export async function atualizarNfcacheEtiquetaDiaAtual(): Promise<number> {
       UPDATE ${coreConfig.DB_NAME_DADOS}.nfcache
         SET updatedAt = NOW()
       WHERE sync = 0
-        AND date = ?
+        AND ${dateFilter}
     `
-  const updateParams = [hoje]
+  const updateParams = dateParams
 
   console.log('[MERCADOLIVRE][ETIQUETA][DB] Update nfcache', {
     sql: updateSql,

@@ -33,6 +33,7 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | `MERCADOLIVRE_SFTP_USER` | Usuario do SFTP. | Informe o usuario de acesso. |
 | `MERCADOLIVRE_SFTP_PASSWORD` | Senha do SFTP. | Informe a senha do usuario. |
 | `MERCADOLIVRE_DAYS_TO_FETCH` | Quantos dias voltar na busca de notas. | Ex: `3` para buscar os ultimos 3 dias. |
+| `ETIQUE_DAYS_TO_FETCH` | Quantos dias considerar na atualizacao do nfcache de etiqueta. | Ex: `3` para atualizar hoje e os 2 dias anteriores. Se vazio, usa `1`. |
 | `MERCADOLIVRE_END_TO_FETCH` | Dia final da busca normal. | Use `0` para fechar em hoje. |
 | `MERCADOLIVRE_END_SFTP` | Dia final da busca SFTP. | Use `0` para fechar em hoje. |
 | `MERCADOLIVRE_MAX_RETRY_COUNT` | Limite de retry para notas nao integradas. | Informe um numero, ex: `5000`. |

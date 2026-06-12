@@ -31,6 +31,10 @@ const tests: TestCase[] = [
     file: path.resolve(__dirname, 'mercadolivre/sincronizar-etiqueta.integration.test.ts')
   },
   {
+    name: 'integration: atualizar nfcache etiqueta',
+    file: path.resolve(__dirname, 'mercadolivre/atualizar-nfcache-etiqueta.integration.test.ts')
+  },
+  {
     name: 'integration: pluggto buscar-pedidos com filtro de status',
     file: path.resolve(__dirname, 'pluggto/buscar-pedidos.integration.test.ts')
   },
