@@ -23,7 +23,6 @@ type BuscarNotasParams = {
   refreshToken: string
   endOverride?: number
   sftpMode?: boolean
-  downloadAttempt?: number
 }
 
 type BuscarNotasResult = {
@@ -35,19 +34,6 @@ type BuscarNotasResult = {
 const delay = (ms: number) =>
   new Promise(resolve => setTimeout(resolve, ms))
 
-const MAX_DOWNLOAD_ATTEMPTS = 3
-
-function isArchiveError(error: any): boolean {
-  const message = String(error?.message ?? '')
-
-  return (
-    message.includes('Bad archive') ||
-    message.includes('Arquivo ZIP') ||
-    message.includes('ZIP ')
-  )
-}
-
-
 export async function buscarNotasMercadoLivre(
   params: BuscarNotasParams
 ): Promise<BuscarNotasResult> {
@@ -58,7 +44,6 @@ export async function buscarNotasMercadoLivre(
     clientSecret,
     accessToken,
     refreshToken,
-    downloadAttempt = 1,
     sftpMode = false
   } = params
 
@@ -83,7 +68,7 @@ export async function buscarNotasMercadoLivre(
     `/invoices/sites/MLB/batch_request/period/stream` +
     `?start=${startDate}&end=${endDate}` +
     `&sale=all&return=all&full=all&others=all` +
-    `&file_types=xml&simple_folder=true`
+    `&file_types=xml`
 
   console.log('[MERCADOLIVRE][BUSCA] URL', { url })
 
@@ -118,8 +103,7 @@ export async function buscarNotasMercadoLivre(
 
     console.log('[MERCADOLIVRE][ZIP] Download finalizado', {
       zipPath,
-      bytes: zipStats.size,
-      tentativa: downloadAttempt
+      bytes: zipStats.size
     })
 
     const extractedFiles = await extractAllFiles(zipPath, outputDir)
@@ -245,34 +229,8 @@ export async function buscarNotasMercadoLivre(
 
       return buscarNotasMercadoLivre({
         ...params,
-        accessToken: newAccessToken,
-        downloadAttempt
+        accessToken: newAccessToken
       })
-    }
-
-    if (isArchiveError(error)) {
-      if (downloadAttempt < MAX_DOWNLOAD_ATTEMPTS) {
-        console.warn('[MERCADOLIVRE][ZIP] Arquivo inválido. Tentando baixar novamente', {
-          clienteId,
-          tentativaAtual: downloadAttempt,
-          proximaTentativa: downloadAttempt + 1
-        })
-
-        await delay(10 * 1000)
-
-        return buscarNotasMercadoLivre({
-          ...params,
-          downloadAttempt: downloadAttempt + 1
-        })
-      }
-
-      console.error('[MERCADOLIVRE][ZIP] Falha definitiva ao abrir ZIP baixado', {
-        clienteId,
-        tentativas: downloadAttempt,
-        zipPath
-      })
-
-      throw error
     }
 
     console.log('[MERCADOLIVRE][BUSCA] Retornando lista vazia por erro não tratável', {

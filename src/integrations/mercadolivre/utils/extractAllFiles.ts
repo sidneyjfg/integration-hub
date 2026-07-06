@@ -3,6 +3,22 @@ import fs from 'fs'
 import path from 'path'
 import getAllXmlFiles from './getAllXmlFiles'
 
+const normalizePath = (filePath: string) =>
+  filePath.replace(/\\/g, '/').toLowerCase()
+
+function filterMercadoLivreIssuedXml(files: string[]): string[] {
+  const filtered = files.filter(file => {
+    const normalized = normalizePath(file)
+
+    return (
+      normalized.includes('/emitidas_mercado_livre/xml/') ||
+      normalized.includes('emitidas_mercado_livre/xml/')
+    )
+  })
+
+  return filtered.length > 0 ? filtered : files
+}
+
 async function waitForStableFile(
   filePath: string,
   stableMs = 800
@@ -58,7 +74,9 @@ export default async function extractAllFiles(
 
   try {
     await zip.extract(null, outputDir)
-    const files = await getAllXmlFiles(outputDir)
+    const files = filterMercadoLivreIssuedXml(
+      await getAllXmlFiles(outputDir)
+    )
 
     const logPath = path.join(outputDir, 'extraction_log.txt')
     await fs.promises.writeFile(logPath, files.join('\n'))
