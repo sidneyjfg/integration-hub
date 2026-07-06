@@ -26,8 +26,12 @@ export const coreEnvSchema = z.object({
   CRON_NOTAS_SFTP: z.string().optional(),
   USA_ETIQUETA: z.preprocess(emptyToUndefined, z.string().optional()),
   GOOGLE_CHAT_WEBHOOK_URL: z.string().url(),
-  GOOGLE_CHAT_WEBHOOK_URL_ERROR: z.string().url().optional(),
-  GOOGLE_CHAT_WEBHOOK_URL_WARNING: z.string().url().optional(),
+  GOOGLE_CHAT_WEBHOOK_URL_ERROR: z.string().url().optional().or(z.literal("")),
+  GOOGLE_CHAT_WEBHOOK_URL_WARNING: z
+    .string()
+    .url()
+    .optional()
+    .or(z.literal("")),
   TZ: z.string().optional(),
 });
 

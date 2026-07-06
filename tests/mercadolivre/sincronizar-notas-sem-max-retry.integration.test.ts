@@ -33,7 +33,9 @@ const coreEnvModulePath = path.resolve(
 
 export = async function runSincronizarNotasSemMaxRetryIntegrationTest(): Promise<void> {
   applyMercadoLivreTestEnv({
-    GOOGLE_CHAT_WEBHOOK_URL: 'https://chat.googleapis.com/v1/spaces/test/messages?key=test&token=test'
+    GOOGLE_CHAT_WEBHOOK_URL: 'https://chat.googleapis.com/v1/spaces/test/messages?key=test&token=test',
+    GOOGLE_CHAT_WEBHOOK_URL_WARNING: 'https://chat.googleapis.com/v1/spaces/test/messages?key=test&token=test',
+    GOOGLE_CHAT_WEBHOOK_URL_ERROR: 'https://chat.googleapis.com/v1/spaces/test/messages?key=test&token=test'
   })
 
   clearModules([
@@ -94,7 +96,9 @@ export = async function runSincronizarNotasSemMaxRetryIntegrationTest(): Promise
         })
       },
       [googleChatModulePath]: {
-        notifyGoogleChat: async () => undefined
+        notifyGoogleChat: async () => undefined,
+        notifyGoogleChatWarning: async () => undefined,
+        notifyGoogleChatError: async () => undefined
       }
     }
   )

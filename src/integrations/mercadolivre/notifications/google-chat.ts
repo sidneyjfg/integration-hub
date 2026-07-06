@@ -1,5 +1,5 @@
 import axios from "axios";
-import { mercadolivreConfig } from "../env.schema";
+import { coreConfig } from "../../../core/env.schema";
 
 type GoogleChatMessage =
   | string
@@ -22,7 +22,7 @@ type GoogleChatMessage =
 export async function notifyGoogleChat(
   message: GoogleChatMessage,
 ): Promise<void> {
-  const webhookUrl = mercadolivreConfig.GOOGLE_CHAT_WEBHOOK_URL;
+  const webhookUrl = coreConfig.GOOGLE_CHAT_WEBHOOK_URL;
 
   if (!webhookUrl) {
     console.warn(
@@ -60,7 +60,7 @@ export async function notifyGoogleChat(
 export async function notifyGoogleChatWarning(
   message: GoogleChatMessage,
 ): Promise<void> {
-  const webhookUrl = mercadolivreConfig.GOOGLE_CHAT_WEBHOOK_URL_WARNING;
+  const webhookUrl = coreConfig.GOOGLE_CHAT_WEBHOOK_URL_WARNING;
 
   if (!webhookUrl) {
     console.warn(
@@ -98,7 +98,7 @@ export async function notifyGoogleChatWarning(
 export async function notifyGoogleChatError(
   message: GoogleChatMessage,
 ): Promise<void> {
-  const webhookUrl = mercadolivreConfig.GOOGLE_CHAT_WEBHOOK_URL_ERROR;
+  const webhookUrl = coreConfig.GOOGLE_CHAT_WEBHOOK_URL_ERROR;
 
   if (!webhookUrl) {
     console.warn(

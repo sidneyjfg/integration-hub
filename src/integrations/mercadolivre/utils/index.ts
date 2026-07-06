@@ -9,6 +9,7 @@ import moveFilesLocal from './move-files-local'
 import sendFilesViaSFTP from './send-file-sftp'
 import filtrarPorIgnoreEndFile from './filter-ignore-end-file'
 import filtrarPorTipoNota from './filter-ignore-tipo-nota'
+import { getNotasWorkspace } from './notas-workspace'
 
 export {
     calculateDate,
@@ -21,5 +22,6 @@ export {
     moveFilesLocal,
     sendFilesViaSFTP,
     filtrarPorIgnoreEndFile,
-    filtrarPorTipoNota
+    filtrarPorTipoNota,
+    getNotasWorkspace
 }

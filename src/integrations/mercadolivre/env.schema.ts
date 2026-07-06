@@ -47,13 +47,6 @@ export const mercadolivreEnvSchema = z.object({
   MERCADOLIVRE_SFTP_UID: z.coerce.number().optional(),
   MERCADOLIVRE_SFTP_GID: z.coerce.number().optional(),
   // 📣 Notificação
-  GOOGLE_CHAT_WEBHOOK_URL: z.string().url().optional().or(z.literal("")),
-  GOOGLE_CHAT_WEBHOOK_URL_WARNING: z
-    .string()
-    .url()
-    .optional()
-    .or(z.literal("")),
-  GOOGLE_CHAT_WEBHOOK_URL_ERROR: z.string().url().optional().or(z.literal("")),
 });
 
 export type MercadoLivreConfig = z.infer<typeof mercadolivreEnvSchema>;

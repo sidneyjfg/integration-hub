@@ -82,10 +82,14 @@ export = async function runSincronizarNotasIntegrationTest(): Promise<void> {
 
     applyMercadoLivreTestEnv({
       GOOGLE_CHAT_WEBHOOK_URL: `http://127.0.0.1:${address.port}/webhook`,
+      GOOGLE_CHAT_WEBHOOK_URL_WARNING: `http://127.0.0.1:${address.port}/webhook`,
+      GOOGLE_CHAT_WEBHOOK_URL_ERROR: `http://127.0.0.1:${address.port}/webhook`,
       MERCADOLIVRE_MAX_RETRY_COUNT: '5'
     })
   } else {
     applyMercadoLivreTestEnv({
+      GOOGLE_CHAT_WEBHOOK_URL_WARNING: currentWebhookUrl!,
+      GOOGLE_CHAT_WEBHOOK_URL_ERROR: currentWebhookUrl!,
       MERCADOLIVRE_MAX_RETRY_COUNT: '5'
     })
   }
@@ -216,7 +220,7 @@ export = async function runSincronizarNotasIntegrationTest(): Promise<void> {
     assert.deepEqual(retryCountUpdates, [
       ['35222222222222222222222222222222222222222222']
     ])
-    assert.equal(notifications.length, 2)
+    assert.equal(notifications.length, 3)
     assert.match(
       notifications[0].body.text,
       /2 notas do Mercado Livre não integradas no Nérus/

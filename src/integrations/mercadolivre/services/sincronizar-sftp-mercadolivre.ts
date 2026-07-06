@@ -1,7 +1,11 @@
 import path from "path";
 
 import { buscarNotasMercadoLivre } from "../api/buscar-notas-mercadolivre";
-import { filtrarPorIgnoreEndFile, getAllXmlFiles } from "../utils";
+import {
+  filtrarPorIgnoreEndFile,
+  getAllXmlFiles,
+  getNotasWorkspace,
+} from "../utils";
 import {
   notifyGoogleChat,
   notifyGoogleChatError,
@@ -91,7 +95,7 @@ export async function sincronizarSFTPMercadoLivre(): Promise<void> {
 
       // 📦 VONDER → inclui TODOS os XML (CTE + EVENTOS)
       if (isSftpMode) {
-        const extractRoot = path.resolve("./notas/xml");
+        const extractRoot = path.resolve(getNotasWorkspace(true).xmlDir);
         const allXmlFiles = await getAllXmlFiles(extractRoot);
 
         const extras = allXmlFiles.filter((f) => !files.includes(f));

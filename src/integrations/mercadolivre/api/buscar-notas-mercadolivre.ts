@@ -1,5 +1,6 @@
 import axios from 'axios'
 import fs from 'fs'
+import { pipeline } from 'stream/promises'
 import { parseStringPromise } from 'xml2js'
 
 import { mercadolivreConfig } from '../env.schema'
@@ -7,7 +8,8 @@ import {
   calculateDate,
   deleteFiles,
   extractAllFiles,
-  extractOrderDataFromXML
+  extractOrderDataFromXML,
+  getNotasWorkspace
 } from '../utils'
 
 import { MercadoLivreNotaBody } from '../../../shared/types'
@@ -21,6 +23,7 @@ type BuscarNotasParams = {
   refreshToken: string
   endOverride?: number
   sftpMode?: boolean
+  downloadAttempt?: number
 }
 
 type BuscarNotasResult = {
@@ -31,6 +34,18 @@ type BuscarNotasResult = {
 
 const delay = (ms: number) =>
   new Promise(resolve => setTimeout(resolve, ms))
+
+const MAX_DOWNLOAD_ATTEMPTS = 3
+
+function isArchiveError(error: any): boolean {
+  const message = String(error?.message ?? '')
+
+  return (
+    message.includes('Bad archive') ||
+    message.includes('Arquivo ZIP') ||
+    message.includes('ZIP ')
+  )
+}
 
 
 export async function buscarNotasMercadoLivre(
@@ -43,6 +58,7 @@ export async function buscarNotasMercadoLivre(
     clientSecret,
     accessToken,
     refreshToken,
+    downloadAttempt = 1,
     sftpMode = false
   } = params
 
@@ -75,11 +91,11 @@ export async function buscarNotasMercadoLivre(
     Authorization: `Bearer ${accessToken}`
   }
 
-  const outputDir = './notas'
+  const { baseDir: outputDir, xmlDir } = getNotasWorkspace(sftpMode)
   const zipPath = `${outputDir}/notas_${clienteId}.zip`
 
   try {
-    await deleteFiles(zipPath, `${outputDir}/xml`)
+    await deleteFiles(zipPath, xmlDir)
     await fs.promises.mkdir(outputDir, { recursive: true })
 
     console.log('[MERCADOLIVRE][DOWNLOAD] Iniciando ZIP', { clienteId })
@@ -91,18 +107,20 @@ export async function buscarNotasMercadoLivre(
 
     console.log('[MERCADOLIVRE][DOWNLOAD] Status', {
       clienteId,
-      status: response.status
+      status: response.status,
+      contentType: response.headers?.['content-type'],
+      contentLength: response.headers?.['content-length']
     })
 
-    const zipFile = fs.createWriteStream(zipPath)
-    response.data.pipe(zipFile)
+    await pipeline(response.data, fs.createWriteStream(zipPath))
 
-    await new Promise<void>((resolve, reject) => {
-      zipFile.on('finish', resolve)
-      zipFile.on('error', reject)
+    const zipStats = await fs.promises.stat(zipPath)
+
+    console.log('[MERCADOLIVRE][ZIP] Download finalizado', {
+      zipPath,
+      bytes: zipStats.size,
+      tentativa: downloadAttempt
     })
-
-    console.log('[MERCADOLIVRE][ZIP] Download finalizado', { zipPath })
 
     const extractedFiles = await extractAllFiles(zipPath, outputDir)
 
@@ -227,8 +245,34 @@ export async function buscarNotasMercadoLivre(
 
       return buscarNotasMercadoLivre({
         ...params,
-        accessToken: newAccessToken
+        accessToken: newAccessToken,
+        downloadAttempt
       })
+    }
+
+    if (isArchiveError(error)) {
+      if (downloadAttempt < MAX_DOWNLOAD_ATTEMPTS) {
+        console.warn('[MERCADOLIVRE][ZIP] Arquivo inválido. Tentando baixar novamente', {
+          clienteId,
+          tentativaAtual: downloadAttempt,
+          proximaTentativa: downloadAttempt + 1
+        })
+
+        await delay(10 * 1000)
+
+        return buscarNotasMercadoLivre({
+          ...params,
+          downloadAttempt: downloadAttempt + 1
+        })
+      }
+
+      console.error('[MERCADOLIVRE][ZIP] Falha definitiva ao abrir ZIP baixado', {
+        clienteId,
+        tentativas: downloadAttempt,
+        zipPath
+      })
+
+      throw error
     }
 
     console.log('[MERCADOLIVRE][BUSCA] Retornando lista vazia por erro não tratável', {
