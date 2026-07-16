@@ -1,6 +1,5 @@
 import {
   salvarNotasTmpMercadoLivre,
-  // buscarNotasNaoIntegradasNerus,
   buscarNotasNaoIntegradasNerusPorChaves,
   verificarECriarTabelaTmpNotas,
   buscarCredenciaisMercadoLivre,
@@ -16,15 +15,27 @@ import { buscarNotasMercadoLivre } from "../api/buscar-notas-mercadolivre";
 import { mercadolivreConfig } from "../env.schema";
 import { buildNotasNaoIntegradasCard } from "../notifications/build-notas-notification";
 
+interface RetryResult {
+  notasParaRevisao: Array<{ CHAVE_NFE?: string }>;
+  zeradas: number;
+}
+
 async function processarRetryNotasNaoIntegradas(
   notasNaoIntegradas: Array<{ CHAVE_NFE?: string }>,
-): Promise<void> {
+): Promise<RetryResult> {
   const maxRetryCount = mercadolivreConfig.MERCADOLIVRE_MAX_RETRY_COUNT;
 
-  if (maxRetryCount == null) return;
+  const resultado: RetryResult = {
+    notasParaRevisao: [],
+    zeradas: 0,
+  };
+
+  if (maxRetryCount == null) {
+    resultado.notasParaRevisao = notasNaoIntegradas;
+    return resultado;
+  }
 
   let avaliadas = 0;
-  let zeradas = 0;
   let ignoradas = 0;
   let semRetryCount = 0;
 
@@ -33,6 +44,7 @@ async function processarRetryNotasNaoIntegradas(
 
     if (!nfeKey) {
       ignoradas++;
+      resultado.notasParaRevisao.push(nota);
       continue;
     }
 
@@ -41,25 +53,33 @@ async function processarRetryNotasNaoIntegradas(
 
     if (retryCount == null) {
       semRetryCount++;
+      resultado.notasParaRevisao.push(nota);
       continue;
     }
 
     if (retryCount < maxRetryCount) {
       const affectedRows = await zerarRetryCountFfpreprocnf({ nfeKey });
-      if (affectedRows > 0) zeradas++;
+      if (affectedRows > 0) {
+        resultado.zeradas++;
+      } else {
+        resultado.notasParaRevisao.push(nota);
+      }
       continue;
     }
 
     ignoradas++;
+    resultado.notasParaRevisao.push(nota);
   }
 
   console.log("[MERCADOLIVRE][SYNC][RETRY] Processamento finalizado", {
     maxRetryCount,
     avaliadas,
-    zeradas,
+    zeradas: resultado.zeradas,
     ignoradas,
     semRetryCount,
   });
+
+  return resultado;
 }
 
 export async function sincronizarNotasMercadoLivre(): Promise<void> {
@@ -138,24 +158,34 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
         });
 
         if (notasNaoIntegradas.length > 0) {
-          await processarRetryNotasNaoIntegradas(notasNaoIntegradas);
+          const { notasParaRevisao, zeradas } =
+            await processarRetryNotasNaoIntegradas(notasNaoIntegradas);
 
-          // 🔔 resumo
-          await notifyGoogleChatWarning(
-            `⚠️ ${notasNaoIntegradas.length} notas do Mercado Livre não integradas no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}).`,
-          );
+          if (zeradas > 0) {
+            await notifyGoogleChat(
+              `🔄 Auto-cura: ${zeradas} nota(s) tiveram o contador zerado e tentarão integrar novamente (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}).`,
+            );
+          }
 
-          // 📋 cards por nota
-          const card = buildNotasNaoIntegradasCard(
-            notasNaoIntegradas,
-            clienteId,
-          );
+          if (notasParaRevisao.length > 0) {
+            const mensagemRevisao = `${notasParaRevisao.length} nota(s) do Mercado Livre excederam o limite de tentativas ou falharam e precisam de revisão manual no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}).`;
 
-          await notifyGoogleChatWarning(card);
-        }
-        {
+            if (notasParaRevisao.length > 300) {
+              await notifyGoogleChatError(`❌ ${mensagemRevisao}`);
+            } else {
+              await notifyGoogleChatWarning(`⚠️ ${mensagemRevisao}`);
+            }
+
+            // const card = buildNotasNaoIntegradasCard(
+            //   notasParaRevisao,
+            //   clienteId,
+            // );
+
+            // await notifyGoogleChatWarning(card);
+          }
+        } else {
           await notifyGoogleChat(
-            `✅ Todas as notas do Mercado Livre foram integradas no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}).`,
+            `✅ Todas as notas do Mercado Livre já constam integradas no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}).`,
           );
         }
 
