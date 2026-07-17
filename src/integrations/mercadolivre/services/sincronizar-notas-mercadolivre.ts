@@ -57,7 +57,7 @@ async function processarRetryNotasNaoIntegradas(
       continue;
     }
 
-    if (retryCount < maxRetryCount) {
+    if (retryCount >= maxRetryCount) {
       const affectedRows = await zerarRetryCountFfpreprocnf({ nfeKey });
       if (affectedRows > 0) {
         resultado.zeradas++;
