@@ -10,6 +10,13 @@ const toBool = (v: unknown) => {
   return false;
 };
 
+const emptyToUndefined = (v: unknown) => {
+  if (typeof v !== "string") return v;
+
+  const value = v.trim();
+  return value === "" ? undefined : value;
+};
+
 export const mercadolivreEnvSchema = z.object({
   CLIENT_NAME: z.string().optional(),
 
@@ -21,6 +28,8 @@ export const mercadolivreEnvSchema = z.object({
 
   // ⏱️ Período de busca
   MERCADOLIVRE_DAYS_TO_FETCH: z.coerce.number().min(1),
+  ETIQUE_DAYS_TO_FETCH: z
+    .preprocess(emptyToUndefined, z.coerce.number().int().min(1).default(1)),
   MERCADOLIVRE_END_TO_FETCH: z.coerce.number().min(0).default(0),
   MERCADOLIVRE_END_SFTP: z.coerce.number().min(0).default(0),
   // ⚠️ Comportamentos opcionais
