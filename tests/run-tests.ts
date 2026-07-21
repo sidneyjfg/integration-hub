@@ -7,6 +7,10 @@ type TestCase = {
 
 const tests: TestCase[] = [
   {
+    name: 'unit: filtro de XMLs emitidos',
+    file: path.resolve(__dirname, 'mercadolivre/extract-all-files.test.ts')
+  },
+  {
     name: 'unit: build-notas-notification',
     file: path.resolve(__dirname, 'mercadolivre/build-notas-notification.test.ts')
   },

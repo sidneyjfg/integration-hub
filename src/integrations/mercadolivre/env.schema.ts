@@ -36,6 +36,9 @@ export const mercadolivreEnvSchema = z.object({
   MERCADOLIVRE_DISPONIBILIZA_XML_DIVERGENTE: z
     .preprocess(toBool, z.boolean())
     .default(false),
+  MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP: z
+    .preprocess(toBool, z.boolean())
+    .default(false),
 
   MERCADOLIVRE_MAX_RETRY_COUNT: z.preprocess(
     (value) => (value === "" ? undefined : value),

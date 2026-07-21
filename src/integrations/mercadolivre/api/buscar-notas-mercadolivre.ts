@@ -55,7 +55,8 @@ export async function buscarNotasMercadoLivre(
 
   const {
     MERCADOLIVRE_DAYS_TO_FETCH,
-    MERCADOLIVRE_END_TO_FETCH
+    MERCADOLIVRE_END_TO_FETCH,
+    MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP
   } = mercadolivreConfig
 
   const startDate = calculateDate(MERCADOLIVRE_DAYS_TO_FETCH)
@@ -106,7 +107,11 @@ export async function buscarNotasMercadoLivre(
       bytes: zipStats.size
     })
 
-    const extractedFiles = await extractAllFiles(zipPath, outputDir)
+    const extractedFiles = await extractAllFiles(
+      zipPath,
+      outputDir,
+      MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP
+    )
 
     console.log('[MERCADOLIVRE][ZIP] Extração concluída', {
       clienteId,

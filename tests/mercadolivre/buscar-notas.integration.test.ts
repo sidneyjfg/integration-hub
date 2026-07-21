@@ -26,11 +26,14 @@ const utilsModulePath = path.resolve(
 const axiosModulePath = require.resolve('axios')
 
 export = async function runBuscarNotasIntegrationTest(): Promise<void> {
-  applyMercadoLivreTestEnv()
+  applyMercadoLivreTestEnv({
+    MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP: 'true'
+  })
   clearModules([buscarNotasModulePath, envModulePath, utilsModulePath])
 
   const realUtils = require(utilsModulePath) as UtilsModule
   const axiosMock = createMercadoLivreAxiosMock()
+  let includeOtherErp: boolean | undefined
 
   const { buscarNotasMercadoLivre } = requireWithMocks<BuscarNotasModule>(
     buscarNotasModulePath,
@@ -38,7 +41,14 @@ export = async function runBuscarNotasIntegrationTest(): Promise<void> {
       [axiosModulePath]: axiosMock,
       [utilsModulePath]: {
         ...realUtils,
-        extractAllFiles: async () => getMercadoLivreXmlFixturePaths()
+        extractAllFiles: async (
+          _zipPath: string,
+          _outputDir: string,
+          include: boolean
+        ) => {
+          includeOtherErp = include
+          return getMercadoLivreXmlFixturePaths()
+        }
       }
     }
   )
@@ -51,6 +61,7 @@ export = async function runBuscarNotasIntegrationTest(): Promise<void> {
     refreshToken: 'refresh-token'
   })
 
+  assert.equal(includeOtherErp, true)
   assert.equal(result.notas.length, 3)
   assert.deepEqual(
     result.notas.map(nota => ({
