@@ -60,7 +60,10 @@ export async function notifyGoogleChat(
 export async function notifyGoogleChatWarning(
   message: GoogleChatMessage,
 ): Promise<void> {
-  const webhookUrl = coreConfig.GOOGLE_CHAT_WEBHOOK_URL_WARNING;
+
+  const webhookUrl =
+    coreConfig.GOOGLE_CHAT_WEBHOOK_URL_WARNING ||
+    coreConfig.GOOGLE_CHAT_WEBHOOK_URL;
 
   if (!webhookUrl) {
     console.warn(
@@ -98,7 +101,10 @@ export async function notifyGoogleChatWarning(
 export async function notifyGoogleChatError(
   message: GoogleChatMessage,
 ): Promise<void> {
-  const webhookUrl = coreConfig.GOOGLE_CHAT_WEBHOOK_URL_ERROR;
+
+  const webhookUrl =
+    coreConfig.GOOGLE_CHAT_WEBHOOK_URL_ERROR ||
+    coreConfig.GOOGLE_CHAT_WEBHOOK_URL;
 
   if (!webhookUrl) {
     console.warn(

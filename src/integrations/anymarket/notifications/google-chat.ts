@@ -76,10 +76,9 @@ export async function notifyGoogleChatWarning(
   message: string,
   totalDivergencias?: number,
 ): Promise<void> {
-  if (!coreConfig.GOOGLE_CHAT_WEBHOOK_URL_WARNING) {
-    console.warn("[GOOGLE_CHAT] Webhook não configurado. Mensagem ignorada.");
-    return;
-  }
+  const webhookUrl =
+    coreConfig.GOOGLE_CHAT_WEBHOOK_URL_WARNING ??
+    coreConfig.GOOGLE_CHAT_WEBHOOK_URL;
 
   const isTooLarge = message.length > GOOGLE_CHAT_MAX_CHARS;
 
@@ -90,7 +89,7 @@ export async function notifyGoogleChatWarning(
   const payload = buildPayload(finalMessage);
 
   try {
-    await axios.post(coreConfig.GOOGLE_CHAT_WEBHOOK_URL_WARNING, payload, {
+    await axios.post(webhookUrl, payload, {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error: any) {
@@ -102,15 +101,14 @@ export async function notifyGoogleChatWarning(
 }
 
 export async function notifyGoogleChatError(message: string): Promise<void> {
-  if (!coreConfig.GOOGLE_CHAT_WEBHOOK_URL_ERROR) {
-    console.warn("[GOOGLE_CHAT] Webhook não configurado. Mensagem ignorada.");
-    return;
-  }
+  const webhookUrl =
+    coreConfig.GOOGLE_CHAT_WEBHOOK_URL_ERROR ??
+    coreConfig.GOOGLE_CHAT_WEBHOOK_URL;
 
   const payload = buildPayload(message);
 
   try {
-    await axios.post(coreConfig.GOOGLE_CHAT_WEBHOOK_URL_ERROR, payload, {
+    await axios.post(webhookUrl, payload, {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error: any) {
