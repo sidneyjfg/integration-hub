@@ -28,6 +28,7 @@ export function applyMercadoLivreTestEnv(
     MERCADOLIVRE_SFTP_ENABLED: 'false',
     MERCADOLIVRE_USE_LEDGER: 'false',
     MERCADOLIVRE_DISPONIBILIZA_XML_DIVERGENTE: 'false',
+    MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP: 'false',
     MERCADOLIVRE_IGNORE_SERIE: '',
     ...overrides
   })

@@ -57,6 +57,7 @@ export = async function runSincronizarPedidosNaoIntegradosTest(): Promise<void> 
 
   applyPluggtoTestEnv({
     GOOGLE_CHAT_WEBHOOK_URL: `http://127.0.0.1:${address.port}/webhook`,
+    GOOGLE_CHAT_WEBHOOK_URL_WARNING: `http://127.0.0.1:${address.port}/webhook`,
     PLUGGTO_NO_LOOK_STATUS_TYPES: 'canceled'
   })
 

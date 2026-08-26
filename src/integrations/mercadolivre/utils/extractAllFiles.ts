@@ -3,6 +3,36 @@ import fs from 'fs'
 import path from 'path'
 import getAllXmlFiles from './getAllXmlFiles'
 
+const normalizePath = (filePath: string) =>
+  filePath.replace(/\\/g, '/').toLowerCase()
+
+export function filterIssuedXml(
+  files: string[],
+  includeOtherErp = false
+): string[] {
+  const filtered = files.filter(file => {
+    const normalized = normalizePath(file)
+    const isMercadoLivre =
+      normalized.includes('/emitidas_mercado_livre/xml/') ||
+      normalized.includes('emitidas_mercado_livre/xml/')
+    const isOtherErp =
+      normalized.includes('/emitidas_outros_erp/xml/') ||
+      normalized.includes('emitidas_outros_erp/xml/')
+
+    return isMercadoLivre || (includeOtherErp && isOtherErp)
+  })
+
+  if (filtered.length > 0) return filtered
+
+  // Mantem o fallback para ZIPs sem a estrutura conhecida, mas nunca importa
+  // emitidas_outros_erp enquanto a opcao estiver desabilitada.
+  return includeOtherErp
+    ? files
+    : files.filter(file =>
+        !normalizePath(file).includes('emitidas_outros_erp/xml/')
+      )
+}
+
 async function waitForStableFile(
   filePath: string,
   stableMs = 800
@@ -42,7 +72,8 @@ function isValidZip(filePath: string): boolean {
 
 export default async function extractAllFiles(
   zipPath: string,
-  outputDir: string
+  outputDir: string,
+  includeOtherErp = false
 ): Promise<string[]> {
   if (!fs.existsSync(zipPath)) {
     throw new Error(`ZIP não encontrado: ${zipPath}`)
@@ -58,7 +89,10 @@ export default async function extractAllFiles(
 
   try {
     await zip.extract(null, outputDir)
-    const files = await getAllXmlFiles(outputDir)
+    const files = filterIssuedXml(
+      await getAllXmlFiles(outputDir),
+      includeOtherErp
+    )
 
     const logPath = path.join(outputDir, 'extraction_log.txt')
     await fs.promises.writeFile(logPath, files.join('\n'))

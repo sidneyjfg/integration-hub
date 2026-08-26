@@ -21,6 +21,8 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | `CRON_NOTAS_SFTP` | Agenda a sincronizacao SFTP do Mercado Livre. | Use uma expressao cron valida ou deixe vazio. |
 | `USA_ETIQUETA` | Agenda o cron de etiqueta. | Use uma expressao cron valida ou deixe vazio. |
 | `GOOGLE_CHAT_WEBHOOK_URL` | Envia notificacoes para o Google Chat. | Informe a URL completa do webhook. |
+| `GOOGLE_CHAT_WEBHOOK_URL_WARNING` | Envia notificacoes de aviso para o Google Chat. | Informe a URL completa do webhook ou deixe vazio. |
+| `GOOGLE_CHAT_WEBHOOK_URL_ERROR` | Envia notificacoes de erro para o Google Chat. | Informe a URL completa do webhook ou deixe vazio. |
 | `TZ` | Define o fuso horario do processo. | Ex: `America/Sao_Paulo`. |
 
 ## Mercado Livre
@@ -47,7 +49,6 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | `MERCADOLIVRE_IS_VONDER` | Forca o modo Vonder no SFTP. | Use `true` quando o cliente for Vonder. |
 | `MERCADOLIVRE_SFTP_UID` | UID usado em operacoes locais. | Informe o UID numerico. |
 | `MERCADOLIVRE_SFTP_GID` | GID usado em operacoes locais. | Informe o GID numerico. |
-| `GOOGLE_CHAT_WEBHOOK_URL` | Envia notificacoes do Mercado Livre. | Informe a URL completa do webhook. |
 
 ## AnyMarket
 

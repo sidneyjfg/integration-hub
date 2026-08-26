@@ -36,6 +36,9 @@ export const mercadolivreEnvSchema = z.object({
   MERCADOLIVRE_DISPONIBILIZA_XML_DIVERGENTE: z
     .preprocess(toBool, z.boolean())
     .default(false),
+  MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP: z
+    .preprocess(toBool, z.boolean())
+    .default(false),
 
   MERCADOLIVRE_MAX_RETRY_COUNT: z.preprocess(
     (value) => (value === "" ? undefined : value),
@@ -56,13 +59,6 @@ export const mercadolivreEnvSchema = z.object({
   MERCADOLIVRE_SFTP_UID: z.coerce.number().optional(),
   MERCADOLIVRE_SFTP_GID: z.coerce.number().optional(),
   // 📣 Notificação
-  GOOGLE_CHAT_WEBHOOK_URL: z.string().url().optional().or(z.literal("")),
-  GOOGLE_CHAT_WEBHOOK_URL_WARNING: z
-    .string()
-    .url()
-    .optional()
-    .or(z.literal("")),
-  GOOGLE_CHAT_WEBHOOK_URL_ERROR: z.string().url().optional().or(z.literal("")),
 });
 
 export type MercadoLivreConfig = z.infer<typeof mercadolivreEnvSchema>;

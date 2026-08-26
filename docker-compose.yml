@@ -66,6 +66,8 @@ services:
       MERCADOLIVRE_MAX_RETRY_COUNT: 5000
 
       MERCADOLIVRE_DISPONIBILIZA_XML_DIVERGENTE:
+      # Inclui XMLs de emitidas_outros_erp/xml na importacao (padrao: false)
+      MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP: "false"
 
       MERCADOLIVRE_SFTP_ENABLED:
       MERCADOLIVRE_SFTP_DIR:

@@ -1,5 +1,6 @@
 import axios from 'axios'
 import fs from 'fs'
+import { pipeline } from 'stream/promises'
 import { parseStringPromise } from 'xml2js'
 
 import { mercadolivreConfig } from '../env.schema'
@@ -7,7 +8,8 @@ import {
   calculateDate,
   deleteFiles,
   extractAllFiles,
-  extractOrderDataFromXML
+  extractOrderDataFromXML,
+  getNotasWorkspace
 } from '../utils'
 
 import { MercadoLivreNotaBody } from '../../../shared/types'
@@ -32,7 +34,6 @@ type BuscarNotasResult = {
 const delay = (ms: number) =>
   new Promise(resolve => setTimeout(resolve, ms))
 
-
 export async function buscarNotasMercadoLivre(
   params: BuscarNotasParams
 ): Promise<BuscarNotasResult> {
@@ -54,7 +55,8 @@ export async function buscarNotasMercadoLivre(
 
   const {
     MERCADOLIVRE_DAYS_TO_FETCH,
-    MERCADOLIVRE_END_TO_FETCH
+    MERCADOLIVRE_END_TO_FETCH,
+    MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP
   } = mercadolivreConfig
 
   const startDate = calculateDate(MERCADOLIVRE_DAYS_TO_FETCH)
@@ -67,7 +69,7 @@ export async function buscarNotasMercadoLivre(
     `/invoices/sites/MLB/batch_request/period/stream` +
     `?start=${startDate}&end=${endDate}` +
     `&sale=all&return=all&full=all&others=all` +
-    `&file_types=xml&simple_folder=true`
+    `&file_types=xml`
 
   console.log('[MERCADOLIVRE][BUSCA] URL', { url })
 
@@ -75,11 +77,11 @@ export async function buscarNotasMercadoLivre(
     Authorization: `Bearer ${accessToken}`
   }
 
-  const outputDir = './notas'
+  const { baseDir: outputDir, xmlDir } = getNotasWorkspace(sftpMode)
   const zipPath = `${outputDir}/notas_${clienteId}.zip`
 
   try {
-    await deleteFiles(zipPath, `${outputDir}/xml`)
+    await deleteFiles(zipPath, xmlDir)
     await fs.promises.mkdir(outputDir, { recursive: true })
 
     console.log('[MERCADOLIVRE][DOWNLOAD] Iniciando ZIP', { clienteId })
@@ -91,20 +93,25 @@ export async function buscarNotasMercadoLivre(
 
     console.log('[MERCADOLIVRE][DOWNLOAD] Status', {
       clienteId,
-      status: response.status
+      status: response.status,
+      contentType: response.headers?.['content-type'],
+      contentLength: response.headers?.['content-length']
     })
 
-    const zipFile = fs.createWriteStream(zipPath)
-    response.data.pipe(zipFile)
+    await pipeline(response.data, fs.createWriteStream(zipPath))
 
-    await new Promise<void>((resolve, reject) => {
-      zipFile.on('finish', resolve)
-      zipFile.on('error', reject)
+    const zipStats = await fs.promises.stat(zipPath)
+
+    console.log('[MERCADOLIVRE][ZIP] Download finalizado', {
+      zipPath,
+      bytes: zipStats.size
     })
 
-    console.log('[MERCADOLIVRE][ZIP] Download finalizado', { zipPath })
-
-    const extractedFiles = await extractAllFiles(zipPath, outputDir)
+    const extractedFiles = await extractAllFiles(
+      zipPath,
+      outputDir,
+      MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP
+    )
 
     console.log('[MERCADOLIVRE][ZIP] Extração concluída', {
       clienteId,
