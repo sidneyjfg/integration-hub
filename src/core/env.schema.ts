@@ -7,6 +7,13 @@ const emptyToUndefined = (v: unknown) => {
   return value === "" ? undefined : value;
 };
 
+const toBool = (v: unknown) => {
+  if (typeof v === 'boolean') return v
+  if (typeof v === 'number') return v === 1
+  if (typeof v === 'string') return ['1', 'true', 'yes', 'y'].includes(v.trim().toLowerCase())
+  return false
+}
+
 export const coreEnvSchema = z.object({
   PORT: z.coerce.number().default(3000),
 
@@ -24,6 +31,9 @@ export const coreEnvSchema = z.object({
   CRON_PRODUTOS: z.string().optional(),
   CRON_NOTAS_ML: z.string().optional(),
   CRON_NOTAS_SFTP: z.string().optional(),
+  ATIVA_BUSCA_CS: z.preprocess(toBool, z.boolean().default(false)),
+  GOOGLE_SHEETS_SPREADSHEET_ID: z.string().optional(),
+  GOOGLE_SHEETS_CREDENTIALS_FILE: z.string().optional(),
   USA_ETIQUETA: z.preprocess(emptyToUndefined, z.string().optional()),
   GOOGLE_CHAT_WEBHOOK_URL: z.string().url(),
   GOOGLE_CHAT_WEBHOOK_URL_ERROR: z.string().url().optional().or(z.literal("")),

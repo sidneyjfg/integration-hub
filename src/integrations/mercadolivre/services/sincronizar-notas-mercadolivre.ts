@@ -82,8 +82,9 @@ async function processarRetryNotasNaoIntegradas(
   return resultado;
 }
 
-export async function sincronizarNotasMercadoLivre(): Promise<void> {
+export async function sincronizarNotasMercadoLivre(): Promise<boolean> {
   console.log("[MERCADOLIVRE][SYNC] Iniciando sincronização de notas");
+  let houveFalha = false;
 
   try {
     console.log("[MERCADOLIVRE][SYNC] Verificando tabela tmp_notas");
@@ -193,6 +194,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
           clienteId,
         });
       } catch (erroCliente) {
+        houveFalha = true;
         console.error("[MERCADOLIVRE][SYNC][CLIENTE ERRO]", {
           clienteId,
           erro: erroCliente,
@@ -205,6 +207,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
     }
 
     console.log("[MERCADOLIVRE][SYNC] Sincronização geral finalizada");
+    return !houveFalha;
   } catch (erro) {
     console.error("[MERCADOLIVRE][SYNC] ERRO GERAL", erro);
 
