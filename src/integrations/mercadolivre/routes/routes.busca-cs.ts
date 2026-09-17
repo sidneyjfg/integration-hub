@@ -3,7 +3,6 @@ import { buscarResumoBuscaCS } from '../repositories/busca-cs.repository'
 import { executarBuscaCS, resolverPeriodoD1 } from '../services/busca-cs-google-sheets'
 import { coreConfig } from '../../../core/env.schema'
 import { buscarValoresPedidosMercadoLivre } from '../api/buscar-pedidos-mercadolivre'
-import { garantirColunaValorPedido } from '../repositories/mercadolivre-notas.repository'
 
 function d1DaQuery(req: any): string {
   const d1 = String(req.query?.d1 ?? '')
@@ -75,7 +74,6 @@ export default async function buscaCsRoutes(app: FastifyInstance) {
 
       const body = (req.body ?? {}) as any
       const periodo = validarIntervalo(body.inicio, body.fim)
-      await garantirColunaValorPedido()
       const resultado = await buscarValoresPedidosMercadoLivre(
         periodo.inicio,
         periodo.fimExclusivo,

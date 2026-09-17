@@ -221,17 +221,6 @@ export async function verificarECriarTabelaTmpNotas(): Promise<void> {
   console.log('[MERCADOLIVRE][DB] tmp_notas verificada/criada')
 }
 
-export async function garantirColunaValorPedido(): Promise<void> {
-  const [colunas] = await poolMonitoramento.query(
-    `SHOW COLUMNS FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas LIKE 'valor_pedido'`,
-  )
-  if (!(colunas as any[]).length) {
-    await poolMonitoramento.execute(
-      `ALTER TABLE ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas ADD COLUMN valor_pedido DECIMAL(18,2) NULL AFTER valor_total`,
-    )
-  }
-}
-
 export async function buscarPedidosSemValorPedido(
   inicio: string,
   fim: string,

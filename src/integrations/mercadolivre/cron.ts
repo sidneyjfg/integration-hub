@@ -3,7 +3,6 @@ import { sincronizarSFTPMercadoLivre } from './services/sincronizar-sftp-mercado
 import { sincronizarEtiquetaMercadoLivre } from './services/sincronizar-etiqueta-mercadolivre'
 import { executarBuscaCS } from './services/busca-cs-google-sheets'
 import { buscarValoresPedidosMercadoLivre } from './api/buscar-pedidos-mercadolivre'
-import { garantirColunaValorPedido } from './repositories/mercadolivre-notas.repository'
 import { notifyGoogleChat, notifyGoogleChatError } from './notifications/google-chat'
 import { coreConfig } from '../../core/env.schema'
 
@@ -35,7 +34,6 @@ export async function executarCronNotas() {
     if (!coreConfig.ATIVA_BUSCA_CS) return
 
     try {
-      await garantirColunaValorPedido()
       let diasAlterados = [...sincronizacao.diasAlterados]
       if (sincronizacao.periodo) {
         const pedidos = await buscarValoresPedidosMercadoLivre(
