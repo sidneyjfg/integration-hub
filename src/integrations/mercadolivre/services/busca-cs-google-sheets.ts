@@ -123,9 +123,11 @@ async function atualizarAba(
   aba: string,
   tipo: 'Notas' | 'Faturamento',
   resumos: Awaited<ReturnType<typeof buscarResumoDiarioBuscaCS>>,
+  ano: number,
   mes: number,
   diasNoMes: number,
   diaApuracao: number,
+  diasAtualizar?: Set<string>,
 ) {
   const cabecalho = await encontrarCabecalho(api, spreadsheetId, aba, tipo)
   const valores = await api.spreadsheets.values.get({ spreadsheetId, range: intervaloAba(aba, 'A1:ZZ1000'), valueRenderOption: 'UNFORMATTED_VALUE' })
@@ -140,8 +142,13 @@ async function atualizarAba(
   for (let dia = 1; dia <= diasNoMes; dia++) {
     const chave = `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`
     const indiceLinha = datas.get(chave) ?? cabecalho.linha + dia
-    requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.dataColuna)}${indiceLinha + 1}`), values: [[chave]] })
-    if (dia <= diaApuracao) {
+    const deveAtualizar = !diasAtualizar || diasAtualizar.has(
+      `${String(ano).padStart(4, '0')}${String(mes).padStart(2, '0')}${String(dia).padStart(2, '0')}`,
+    )
+    if (!diasAtualizar || deveAtualizar) {
+      requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.dataColuna)}${indiceLinha + 1}`), values: [[chave]] })
+    }
+    if (dia <= diaApuracao && deveAtualizar) {
       const valor = tipo === 'Notas' ? resumos[dia - 1].totalNotas : resumos[dia - 1].valorBruto
       requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.colunaAlvo)}${indiceLinha + 1}`), values: [[valor]] })
     }
@@ -149,7 +156,7 @@ async function atualizarAba(
   if (requests.length) await api.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: { valueInputOption: 'RAW', data: requests } })
 }
 
-export async function executarBuscaCS(d1?: string): Promise<BuscaCSResult> {
+export async function executarBuscaCS(d1?: string, diasParaAtualizar?: string[]): Promise<BuscaCSResult> {
   const { spreadsheetId, auth } = credenciaisSheets()
   const api = google.sheets({ version: 'v4', auth })
   const hoje = agoraEmSaoPaulo()
@@ -160,8 +167,9 @@ export async function executarBuscaCS(d1?: string): Promise<BuscaCSResult> {
   const abaFaturamento = nomeAba(ano, mes, 'Faturamento')
   await localizarOuCriarAba(api, spreadsheetId, ano, mes, 'Notas')
   await localizarOuCriarAba(api, spreadsheetId, ano, mes, 'Faturamento')
-  await atualizarAba(api, spreadsheetId, abaNotas, 'Notas', resumos, mes, diasNoMes, diaApuracao)
-  await atualizarAba(api, spreadsheetId, abaFaturamento, 'Faturamento', resumos, mes, diasNoMes, diaApuracao)
+  const diasAtualizar = diasParaAtualizar ? new Set(diasParaAtualizar) : undefined
+  await atualizarAba(api, spreadsheetId, abaNotas, 'Notas', resumos, ano, mes, diasNoMes, diaApuracao, diasAtualizar)
+  await atualizarAba(api, spreadsheetId, abaFaturamento, 'Faturamento', resumos, ano, mes, diasNoMes, diaApuracao, diasAtualizar)
 
   const atual = resumos[diaApuracao - 1]
   const resultado = {

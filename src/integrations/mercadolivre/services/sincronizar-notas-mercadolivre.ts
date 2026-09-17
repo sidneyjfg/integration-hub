@@ -14,6 +14,7 @@ import {
 import { buscarNotasMercadoLivre } from "../api/buscar-notas-mercadolivre";
 import { mercadolivreConfig } from "../env.schema";
 import { buildNotasNaoIntegradasCard } from "../notifications/build-notas-notification";
+import { PeriodoNotasMercadoLivre } from "../repositories/mercadolivre-notas.repository";
 
 interface RetryResult {
   notasParaRevisao: Array<{ CHAVE_NFE?: string }>;
@@ -82,9 +83,15 @@ async function processarRetryNotasNaoIntegradas(
   return resultado;
 }
 
-export async function sincronizarNotasMercadoLivre(): Promise<boolean> {
+export async function sincronizarNotasMercadoLivre(): Promise<{
+  completo: boolean
+  periodo: PeriodoNotasMercadoLivre | null
+  diasAlterados: string[]
+}> {
   console.log("[MERCADOLIVRE][SYNC] Iniciando sincronização de notas");
   let houveFalha = false;
+  let periodo: PeriodoNotasMercadoLivre | null = null;
+  const diasAlterados = new Set<string>();
 
   try {
     console.log("[MERCADOLIVRE][SYNC] Verificando tabela tmp_notas");
@@ -111,7 +118,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<boolean> {
       console.log("==============================");
 
       try {
-        const { notas } = await buscarNotasMercadoLivre({
+        const { notas, startDate, endDate } = await buscarNotasMercadoLivre({
           clienteId,
           clientId,
           clientSecret,
@@ -119,6 +126,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<boolean> {
           refreshToken,
           sftpMode: false,
         });
+        periodo ??= { inicio: startDate, fim: endDate };
         const chavesCliente = notas.map((n) => n.chave);
 
         console.log("[MERCADOLIVRE][SYNC][BUSCA FINALIZADA]", {
@@ -143,6 +151,9 @@ export async function sincronizarNotasMercadoLivre(): Promise<boolean> {
         });
 
         const insertedCount = await salvarNotasTmpMercadoLivre(notas);
+        for (const dia of (insertedCount as any).diasAlterados ?? []) {
+          diasAlterados.add(String(dia));
+        }
 
         console.log("[MERCADOLIVRE][SYNC][DB] Inserção finalizada", {
           clienteId,
@@ -207,7 +218,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<boolean> {
     }
 
     console.log("[MERCADOLIVRE][SYNC] Sincronização geral finalizada");
-    return !houveFalha;
+    return { completo: !houveFalha, periodo, diasAlterados: [...diasAlterados] };
   } catch (erro) {
     console.error("[MERCADOLIVRE][SYNC] ERRO GERAL", erro);
 
