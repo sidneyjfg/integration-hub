@@ -16,6 +16,11 @@ type NotaCS = {
   valor: string | number | null
 }
 
+const OPERACOES_VALOR_BRUTO = [
+  'Venda de mercadorias',
+  'Devolucao de mercadorias',
+] as const
+
 function valorNumerico(valor: NotaCS['valor']): number {
   if (valor == null) return 0
   const normalizado = String(valor).trim().replace(',', '.')
@@ -29,15 +34,31 @@ export async function buscarResumoBuscaCS(
 ): Promise<ResumoBuscaCS> {
   const sql = `
     SELECT
-      COUNT(DISTINCT chave) AS totalNotas,
-      COALESCE(SUM(CAST(REPLACE(valor, ',', '.') AS DECIMAL(18, 2))), 0) AS valorBruto
-    FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
-    WHERE tipo_logistico = ?
-      AND emissao >= ?
-      AND emissao < ?
+      COUNT(*) AS totalNotas,
+      COALESCE(SUM(valorBruto), 0) AS valorBruto
+    FROM (
+      SELECT
+        chave,
+        MAX(
+          CASE
+            WHEN operacao IN (?, ?) THEN CAST(REPLACE(valor, ',', '.') AS DECIMAL(18, 2))
+            ELSE 0
+          END
+        ) AS valorBruto
+      FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
+      WHERE tipo_logistico = ?
+        AND emissao >= ?
+        AND emissao < ?
+      GROUP BY chave
+    ) notas
   `
 
-  const [rows] = await poolMonitoramento.query(sql, ['Fulfillment', start, endExclusive])
+  const [rows] = await poolMonitoramento.query(sql, [
+    ...OPERACOES_VALOR_BRUTO,
+    'Fulfillment',
+    start,
+    endExclusive,
+  ])
   const row = (rows as any[])[0] ?? {}
 
   return {
@@ -53,14 +74,31 @@ export async function buscarResumoDiarioBuscaCS(
 ): Promise<ResumoDiarioBuscaCS[]> {
   const sql = `
     SELECT emissao, chave, valor
-    FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
-    WHERE tipo_logistico = ?
-      AND emissao >= ?
-      AND emissao < ?
+    FROM (
+      SELECT
+        MAX(emissao) AS emissao,
+        chave,
+        MAX(
+          CASE
+            WHEN operacao IN (?, ?) THEN CAST(REPLACE(valor, ',', '.') AS DECIMAL(18, 2))
+            ELSE 0
+          END
+        ) AS valor
+      FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
+      WHERE tipo_logistico = ?
+        AND emissao >= ?
+        AND emissao < ?
+      GROUP BY chave
+    ) notas
     ORDER BY emissao ASC
   `
 
-  const [rows] = await poolMonitoramento.query(sql, ['Fulfillment', start, endExclusive])
+  const [rows] = await poolMonitoramento.query(sql, [
+    ...OPERACOES_VALOR_BRUTO,
+    'Fulfillment',
+    start,
+    endExclusive,
+  ])
   const notas = rows as NotaCS[]
   const porDia = new Map<number, { chaves: Set<string>; valor: number }>()
 
