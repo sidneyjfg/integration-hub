@@ -12,6 +12,16 @@ export type MercadoLivreCredential = {
   refreshToken: string
 }
 
+export type PeriodoNotasMercadoLivre = {
+  inicio: string
+  fim: string
+}
+
+export type PedidoSemValorPedido = {
+  pedido: string
+  emissao: string
+}
+
 /**
  * 🔍 Verifica se a nota já existe no Nérus (nfeavxml)
  */
@@ -59,6 +69,7 @@ export async function salvarNotasTmpMercadoLivre(
 ): Promise<MercadoLivreNotaBody[]> {
 
   const inseridas: MercadoLivreNotaBody[] = []
+  const diasAlterados = new Set<string>()
 
   let ignoradasSerie = 0
   let ignoradasTipo = 0
@@ -145,6 +156,10 @@ END,
         console.log('[MERCADOLIVRE][DB] Nota atualizada', nota.chave)
       }
 
+      if (result.affectedRows > 0 && nota.emissao) {
+        diasAlterados.add(String(nota.emissao))
+      }
+
       inseridas.push(nota)
 
     } catch (err) {
@@ -167,6 +182,7 @@ END,
   })
 
 
+  ;(inseridas as any).diasAlterados = [...diasAlterados]
   return inseridas
 }
 
@@ -189,6 +205,7 @@ export async function verificarECriarTabelaTmpNotas(): Promise<void> {
         emissao varchar(100) DEFAULT NULL,
         valor varchar(100) DEFAULT NULL,
         valor_total varchar(100) DEFAULT NULL,
+        valor_pedido decimal(18,2) DEFAULT NULL,
         frete varchar(100) DEFAULT NULL,
         observacao varchar(100) DEFAULT NULL,
         data_nfe_ref varchar(100) DEFAULT NULL,
@@ -202,6 +219,43 @@ export async function verificarECriarTabelaTmpNotas(): Promise<void> {
 
   await poolMonitoramento.execute(sql)
   console.log('[MERCADOLIVRE][DB] tmp_notas verificada/criada')
+}
+
+export async function buscarPedidosSemValorPedido(
+  inicio: string,
+  fim: string,
+): Promise<PedidoSemValorPedido[]> {
+  const sql = `
+    SELECT TRIM(venda_remesa) AS pedido, MAX(emissao) AS emissao
+      FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
+     WHERE tipo_logistico = 'Fulfillment'
+       AND emissao >= ?
+       AND emissao < ?
+       AND operacao IN ('Venda de mercadorias', 'Devolucao de mercadorias')
+       AND venda_remesa IS NOT NULL
+       AND TRIM(venda_remesa) <> ''
+       AND valor_pedido IS NULL
+       AND TRIM(venda_remesa) REGEXP '^2000[0-9]+$'
+     GROUP BY TRIM(venda_remesa)
+  `
+  const [rows] = await poolMonitoramento.query(sql, [inicio, fim])
+  return (rows as any[])
+    .map(row => ({ pedido: String(row.pedido), emissao: String(row.emissao ?? '') }))
+    .filter(row => row.pedido)
+}
+
+export async function salvarValorPedido(
+  pedido: string,
+  valor: number,
+): Promise<number> {
+  const sql = `
+    UPDATE ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
+       SET valor_pedido = ?
+     WHERE venda_remesa = ?
+       AND tipo_logistico = 'Fulfillment'
+  `
+  const [result] = await poolMonitoramento.execute(sql, [valor, pedido])
+  return Number((result as any).affectedRows ?? 0)
 }
 
 /**

@@ -21,6 +21,9 @@ services:
       # ⏱️ CRONS
       CRON_NOTAS_SFTP: "15 01 * * *"
       CRON_NOTAS_ML: "10 01 * * *"
+      ATIVA_BUSCA_CS: "false"
+      GOOGLE_SHEETS_SPREADSHEET_ID:
+      GOOGLE_SHEETS_CREDENTIALS_FILE: /run/secrets/google-sheets-service-account.json
       CRON_PRODUTOS: "23 23 * * *"
       CRON_PEDIDOS: "05 23 * * *"
       # Cron da atualização de etiqueta; deixe vazio para não executar
@@ -96,5 +99,12 @@ services:
 
       PORT: 3000
       TZ: America/Sao_Paulo
+    secrets:
+      - source: google_sheets_service_account
+        target: google-sheets-service-account.json
     ports:
       - "3000:3000"
+
+secrets:
+  google_sheets_service_account:
+    file: ./secrets/google-sheets-service-account.json

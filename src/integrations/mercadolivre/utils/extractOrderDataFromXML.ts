@@ -1,14 +1,13 @@
-import { parseISO, format, addHours } from 'date-fns'
+import { parseISO, format } from 'date-fns'
 import extractChaveFromId from './extractChaveFromId'
 import { MercadoLivreNotaBody } from '../../../shared/types'
 
 function formatEmissao(emissaoISO?: string): string | null {
   if (!emissaoISO) return null
 
-  const parsed = parseISO(emissaoISO)
-  const adjusted = addHours(parsed, 3)
-
-  return format(adjusted, 'yyyyMMdd')
+  // dhEmi já informa o fuso da emissão (normalmente -03:00).
+  // Não adicionar horas novamente, pois isso desloca notas para o dia seguinte.
+  return format(parseISO(emissaoISO), 'yyyyMMdd')
 }
 
 
