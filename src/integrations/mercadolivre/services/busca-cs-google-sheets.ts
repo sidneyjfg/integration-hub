@@ -88,9 +88,10 @@ async function localizarOuCriarAba(api: sheets_v4.Sheets, spreadsheetId: string,
   if (existente?.properties?.sheetId != null) return existente.properties.sheetId
 
   const anterior = nomeAba(mes === 1 ? ano - 1 : ano, mes === 1 ? 12 : mes - 1, tipo)
-  const origem = abas.find(a => a.properties?.title === anterior) ?? abas.find(a => normalizar(a.properties?.title) === 'modelo')
+  const modelo = tipo === 'Notas' ? 'modelon' : 'modelof'
+  const origem = abas.find(a => a.properties?.title === anterior) ?? abas.find(a => normalizar(a.properties?.title) === modelo)
   if (!origem?.properties?.sheetId) {
-    throw new Error(`Aba ${atual} ausente e não existe aba modelo para copiar`)
+    throw new Error(`Aba ${atual} ausente e não existe a aba ${modelo} para copiar`)
   }
 
   const copia = await api.spreadsheets.sheets.copyTo({ spreadsheetId, sheetId: origem.properties.sheetId, requestBody: { destinationSpreadsheetId: spreadsheetId } })
