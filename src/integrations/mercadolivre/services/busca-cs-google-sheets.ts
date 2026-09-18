@@ -68,8 +68,8 @@ function intervaloAba(aba: string, intervalo: string) {
 }
 
 const CABECALHOS_PROPRIOS = {
-  Notas: ['Dia', 'Total de notas', 'Meli', 'SAP', 'Pendente'],
-  Faturamento: ['Dia da venda', 'Total', 'Meli', 'SAP', 'Pendente'],
+  Notas: ['Dia', 'Total', 'SAP', 'Pendente'],
+  Faturamento: ['Dia da venda', 'Total', 'SAP', 'Pendente'],
 } as const
 
 function credenciaisSheets() {
@@ -100,7 +100,7 @@ async function localizarOuCriarAba(api: sheets_v4.Sheets, spreadsheetId: string,
   if (novoId == null) throw new Error(`Não foi possível criar a aba ${atual}`)
   await api.spreadsheets.values.update({
     spreadsheetId,
-    range: intervaloAba(atual, 'A1:E1'),
+    range: intervaloAba(atual, 'A1:D1'),
     valueInputOption: 'RAW',
     requestBody: { values: [[...CABECALHOS_PROPRIOS[tipo]]] },
   })
@@ -121,11 +121,10 @@ async function encontrarCabecalho(api: sheets_v4.Sheets, spreadsheetId: string, 
     normalizar(c) === headerApuracao || normalizar(c) === normalizar(CABECALHOS_PROPRIOS[tipo][0]),
   )
   const totalColuna = cabecalhos.findIndex(c => normalizar(c) === normalizar(CABECALHOS_PROPRIOS[tipo][1]))
-  const colunaAlvo = cabecalhos.findIndex(c => normalizar(c) === 'meli')
-  if (dataColuna < 0 || totalColuna < 0 || colunaAlvo < 0) {
+  if (dataColuna < 0 || totalColuna < 0) {
     throw new Error(`Aba ${aba} sem os cabeçalhos necessários da Busca CS`)
   }
-  return { linha, dataColuna, totalColuna, colunaAlvo }
+  return { linha, dataColuna, totalColuna }
 }
 
 async function atualizarAba(
@@ -162,7 +161,6 @@ async function atualizarAba(
     if (dia <= diaApuracao && deveAtualizar) {
       const valor = tipo === 'Notas' ? resumos[dia - 1].totalNotas : resumos[dia - 1].valorBruto
       requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.totalColuna)}${indiceLinha + 1}`), values: [[valor]] })
-      requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.colunaAlvo)}${indiceLinha + 1}`), values: [[valor]] })
     }
   }
   if (requests.length) await api.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: { valueInputOption: 'RAW', data: requests } })
