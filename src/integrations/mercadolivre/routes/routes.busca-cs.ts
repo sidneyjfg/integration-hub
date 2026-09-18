@@ -54,6 +54,34 @@ export default async function buscaCsRoutes(app: FastifyInstance) {
     }
   })
 
+  app.get('/pedidos', async (req, reply) => {
+    try {
+      const query = req.query as { d1?: string; serie?: string }
+      const d1 = String(query?.d1 ?? '')
+      const serie = String(query?.serie ?? '').trim() || undefined
+      const periodo = resolverPeriodoD1(d1)
+      const pedidos = await buscarValoresPedidosMercadoLivre(
+        periodo.inicio,
+        periodo.fim,
+        serie,
+      )
+      const resumo = await buscarResumoBuscaCS(periodo.inicio, periodo.fim, serie)
+
+      return {
+        modo: 'busca-pedidos-e-resumo',
+        d1,
+        serie: serie ?? null,
+        periodo: { inicio: periodo.inicio, fim: d1 },
+        pedidos,
+        resumo,
+      }
+    } catch (error: any) {
+      return reply.code(400).send({
+        erro: error?.message ?? 'Não foi possível buscar os pedidos e montar o resumo',
+      })
+    }
+  })
+
   app.post('/', async (req, reply) => {
     try {
       if (!coreConfig.ATIVA_BUSCA_CS) return reply.code(409).send({ erro: 'ATIVA_BUSCA_CS está desativada' })

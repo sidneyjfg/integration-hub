@@ -276,3 +276,26 @@ ACTIVE_INTEGRATIONS=novohub
 - SQL explícito
 - Sem ORM
 - Código desacoplado
+
+
+2120358288 - serie 12
+533185000 = serie 10
+533187130 - serie 11
+533180837 = serie 8
+
+  curl -X POST "http://gruposeb-full.nerus.com.br:3009/mercadolivre/busca-cs/pedidos/serie" \
+    -H "Content-Type: application/json" \
+    -d '{"inicio":"20260901","fim":"20260917","serie":"12"}'
+
+curl -X POST "http://gruposeb-full.nerus.com.br:3009/mercadolivre/busca-cs/pedidos/serie" \
+    -H "Content-Type: application/json" \
+    -d '{"inicio":"20260901","fim":"20260917","serie":"10"}'
+
+  curl -X POST "http://gruposeb-full.nerus.com.br:3009/mercadolivre/busca-cs/pedidos/serie" \
+    -H "Content-Type: application/json" \
+    -d '{"inicio":"20260901","fim":"20260917","serie":"11"}'
+
+  curl -X POST "http://gruposeb-full.nerus.com.br:3009/mercadolivre/busca-cs/pedidos/serie" \
+    -H "Content-Type: application/json" \
+    -d '{"inicio":"20260901","fim":"20260917","serie":"8"}'
+
