@@ -20,6 +20,7 @@ export type PeriodoNotasMercadoLivre = {
 export type PedidoSemValorPedido = {
   pedido: string
   emissao: string
+  clienteId?: string
 }
 
 /**
@@ -65,7 +66,8 @@ async function checkNotaTemporariaExistente(
  * 💾 Insere notas na tabela tmp_notas (idempotente)
  */
 export async function salvarNotasTmpMercadoLivre(
-  notas: MercadoLivreNotaBody[]
+  notas: MercadoLivreNotaBody[],
+  clienteId?: string,
 ): Promise<MercadoLivreNotaBody[]> {
 
   const inseridas: MercadoLivreNotaBody[] = []
@@ -87,8 +89,8 @@ export async function salvarNotasTmpMercadoLivre(
         (status, venda_remesa, NFe, serie, nome, chave,
         modalidade, operacao, tipo_logistico,
         emissao, valor, valor_total, frete,
-        observacao, data_nfe_ref, chave_nfe_ref)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        observacao, data_nfe_ref, chave_nfe_ref, cliente_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
 status =
 CASE
@@ -109,7 +111,8 @@ END,
   frete = COALESCE(VALUES(frete), frete),
   observacao = COALESCE(VALUES(observacao), observacao),
   data_nfe_ref = COALESCE(VALUES(data_nfe_ref), data_nfe_ref),
-  chave_nfe_ref = COALESCE(VALUES(chave_nfe_ref), chave_nfe_ref)
+  chave_nfe_ref = COALESCE(VALUES(chave_nfe_ref), chave_nfe_ref),
+  cliente_id = COALESCE(VALUES(cliente_id), cliente_id)
     `
   let atualizadas = 0
   for (const nota of notas) {
@@ -141,7 +144,8 @@ END,
         nota.frete ?? null,
         nota.observacao ?? null,
         nota.data_nfe_ref ?? null,
-        nota.chave_nfe_ref ?? null
+        nota.chave_nfe_ref ?? null,
+        clienteId ?? null
       ])
 
       const result = res as any
@@ -210,6 +214,7 @@ export async function verificarECriarTabelaTmpNotas(): Promise<void> {
         observacao varchar(100) DEFAULT NULL,
         data_nfe_ref varchar(100) DEFAULT NULL,
         chave_nfe_ref varchar(100) DEFAULT NULL,
+        cliente_id varchar(100) DEFAULT NULL,
         PRIMARY KEY (chave),
         KEY i2 (NFe, serie),
         KEY i3 (chave_nfe_ref),
@@ -218,6 +223,7 @@ export async function verificarECriarTabelaTmpNotas(): Promise<void> {
     `
 
   await poolMonitoramento.execute(sql)
+
   console.log('[MERCADOLIVRE][DB] tmp_notas verificada/criada')
 }
 
@@ -226,7 +232,9 @@ export async function buscarPedidosSemValorPedido(
   fim: string,
 ): Promise<PedidoSemValorPedido[]> {
   const sql = `
-    SELECT TRIM(venda_remesa) AS pedido, MAX(emissao) AS emissao
+    SELECT TRIM(venda_remesa) AS pedido,
+           MAX(emissao) AS emissao,
+           MAX(cliente_id) AS clienteId
       FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
      WHERE tipo_logistico = 'Fulfillment'
        AND emissao >= ?
@@ -240,7 +248,11 @@ export async function buscarPedidosSemValorPedido(
   `
   const [rows] = await poolMonitoramento.query(sql, [inicio, fim])
   return (rows as any[])
-    .map(row => ({ pedido: String(row.pedido), emissao: String(row.emissao ?? '') }))
+    .map(row => ({
+      pedido: String(row.pedido),
+      emissao: String(row.emissao ?? ''),
+      clienteId: row.clienteId ? String(row.clienteId) : undefined,
+    }))
     .filter(row => row.pedido)
 }
 

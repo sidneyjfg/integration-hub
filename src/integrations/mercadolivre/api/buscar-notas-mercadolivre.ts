@@ -13,7 +13,7 @@ import {
 } from '../utils'
 
 import { MercadoLivreNotaBody } from '../../../shared/types'
-import { refreshAccessToken } from './auth'
+import { cacheAccessToken, refreshAccessToken } from './auth'
 
 type BuscarNotasParams = {
   clienteId: string
@@ -76,6 +76,8 @@ export async function buscarNotasMercadoLivre(
   const headers = {
     Authorization: `Bearer ${accessToken}`
   }
+
+  cacheAccessToken(clienteId, accessToken)
 
   const { baseDir: outputDir, xmlDir } = getNotasWorkspace(sftpMode)
   const zipPath = `${outputDir}/notas_${clienteId}.zip`

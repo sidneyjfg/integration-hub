@@ -67,6 +67,11 @@ function intervaloAba(aba: string, intervalo: string) {
   return `'${aba.replace(/'/g, "''")}'!${intervalo}`
 }
 
+const CABECALHOS_PROPRIOS = {
+  Notas: ['Dia', 'Total de notas', 'Meli', 'SAP', 'Pendente'],
+  Faturamento: ['Dia da venda', 'Total', 'Meli', 'SAP', 'Pendente'],
+} as const
+
 function credenciaisSheets() {
   if (!coreConfig.GOOGLE_SHEETS_SPREADSHEET_ID || !coreConfig.GOOGLE_SHEETS_CREDENTIALS_FILE) {
     throw new Error('Busca CS ativa, mas GOOGLE_SHEETS_SPREADSHEET_ID ou GOOGLE_SHEETS_CREDENTIALS_FILE não foi configurado')
@@ -87,17 +92,18 @@ async function localizarOuCriarAba(api: sheets_v4.Sheets, spreadsheetId: string,
   const existente = abas.find(a => a.properties?.title === atual)
   if (existente?.properties?.sheetId != null) return existente.properties.sheetId
 
-  const anterior = nomeAba(mes === 1 ? ano - 1 : ano, mes === 1 ? 12 : mes - 1, tipo)
-  const modelo = tipo === 'Notas' ? 'modelon' : 'modelof'
-  const origem = abas.find(a => a.properties?.title === anterior) ?? abas.find(a => normalizar(a.properties?.title) === modelo)
-  if (!origem?.properties?.sheetId) {
-    throw new Error(`Aba ${atual} ausente e não existe a aba ${modelo} para copiar`)
-  }
-
-  const copia = await api.spreadsheets.sheets.copyTo({ spreadsheetId, sheetId: origem.properties.sheetId, requestBody: { destinationSpreadsheetId: spreadsheetId } })
-  const novoId = copia.data.sheetId
-  if (novoId == null) throw new Error(`Não foi possível copiar a aba modelo para ${atual}`)
-  await api.spreadsheets.batchUpdate({ spreadsheetId, requestBody: { requests: [{ updateSheetProperties: { properties: { sheetId: novoId, title: atual }, fields: 'title' } }] } })
+  const criada = await api.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: { requests: [{ addSheet: { properties: { title: atual } } }] },
+  })
+  const novoId = criada.data.replies?.[0]?.addSheet?.properties?.sheetId
+  if (novoId == null) throw new Error(`Não foi possível criar a aba ${atual}`)
+  await api.spreadsheets.values.update({
+    spreadsheetId,
+    range: intervaloAba(atual, 'A1:E1'),
+    valueInputOption: 'RAW',
+    requestBody: { values: [[...CABECALHOS_PROPRIOS[tipo]]] },
+  })
   return novoId
 }
 
@@ -105,17 +111,21 @@ async function encontrarCabecalho(api: sheets_v4.Sheets, spreadsheetId: string, 
   const resposta = await api.spreadsheets.values.get({ spreadsheetId, range: intervaloAba(aba, 'A1:ZZ100'), valueRenderOption: 'FORMULA' })
   const valores = resposta.data.values ?? []
   const headerApuracao = tipo === 'Notas' ? HEADER_NOTAS : HEADER_FATURAMENTO
-  const linha = valores.findIndex(row => row.some(celula => normalizar(celula) === headerApuracao))
-  if (linha < 0) throw new Error(`Aba ${aba} sem cabeçalho Dia de Apuração`)
+  const linha = valores.findIndex(row =>
+    row.some(celula => normalizar(celula) === headerApuracao) ||
+    normalizar(row[0]) === normalizar(CABECALHOS_PROPRIOS[tipo][0]),
+  )
+  if (linha < 0) throw new Error(`Aba ${aba} sem cabeçalho de data`)
   const cabecalhos = valores[linha] ?? []
-  const dataColuna = cabecalhos.findIndex(c => normalizar(c) === headerApuracao)
-  const notasColuna = cabecalhos.findIndex(c => normalizar(c).includes('notas emitidas') && normalizar(c).includes('mercado livre'))
-  const faturamentoColuna = cabecalhos.findIndex(c => normalizar(c) === 'mercado livre')
-  const colunaAlvo = tipo === 'Notas' ? notasColuna : faturamentoColuna
-  if (dataColuna < 0 || colunaAlvo < 0) {
+  const dataColuna = cabecalhos.findIndex(c =>
+    normalizar(c) === headerApuracao || normalizar(c) === normalizar(CABECALHOS_PROPRIOS[tipo][0]),
+  )
+  const totalColuna = cabecalhos.findIndex(c => normalizar(c) === normalizar(CABECALHOS_PROPRIOS[tipo][1]))
+  const colunaAlvo = cabecalhos.findIndex(c => normalizar(c) === 'meli')
+  if (dataColuna < 0 || totalColuna < 0 || colunaAlvo < 0) {
     throw new Error(`Aba ${aba} sem os cabeçalhos necessários da Busca CS`)
   }
-  return { linha, dataColuna, colunaAlvo }
+  return { linha, dataColuna, totalColuna, colunaAlvo }
 }
 
 async function atualizarAba(
@@ -151,6 +161,7 @@ async function atualizarAba(
     }
     if (dia <= diaApuracao && deveAtualizar) {
       const valor = tipo === 'Notas' ? resumos[dia - 1].totalNotas : resumos[dia - 1].valorBruto
+      requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.totalColuna)}${indiceLinha + 1}`), values: [[valor]] })
       requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.colunaAlvo)}${indiceLinha + 1}`), values: [[valor]] })
     }
   }

@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { refreshAccessToken } from './auth'
+import { getCachedAccessToken, refreshAccessToken } from './auth'
 import {
   buscarCredenciaisMercadoLivre,
   buscarPedidosSemValorPedido,
@@ -29,7 +29,10 @@ async function consultarPedido(
 ): Promise<PedidoMercadoLivre | null> {
   for (let tentativa = 1; tentativa <= 4; tentativa++) {
     try {
-      const token = tokens.get(credencial.clienteId) ?? credencial.accessToken
+      const token =
+        tokens.get(credencial.clienteId) ??
+        getCachedAccessToken(credencial.clienteId) ??
+        credencial.accessToken
       const resposta = await axios.get<PedidoMercadoLivre>(
         `https://api.mercadolibre.com/orders/${encodeURIComponent(pedido)}`,
         { headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' } },
@@ -82,7 +85,21 @@ export async function buscarValoresPedidosMercadoLivre(
     const pedido = item.pedido
     let encontrado = false
 
-    for (const credencial of credenciais) {
+    const credenciaisDoPedido = item.clienteId
+      ? credenciais.filter(credencial => credencial.clienteId === item.clienteId)
+      : credenciais
+
+    if (item.clienteId && credenciaisDoPedido.length === 0) {
+      resultado.erros++
+      resultado.naoEncontrados++
+      console.error('[MERCADOLIVRE][PEDIDOS] Credencial não encontrada para a conta da nota', {
+        pedido,
+        clienteId: item.clienteId,
+      })
+      continue
+    }
+
+    for (const credencial of credenciaisDoPedido) {
       try {
         const dados = await consultarPedido(pedido, credencial, tokens)
         if (!dados) continue

@@ -150,7 +150,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<{
           chavesExemplo: notas.slice(0, 5).map((n) => n.chave),
         });
 
-        const insertedCount = await salvarNotasTmpMercadoLivre(notas);
+        const insertedCount = await salvarNotasTmpMercadoLivre(notas, clienteId);
         for (const dia of (insertedCount as any).diasAlterados ?? []) {
           diasAlterados.add(String(dia));
         }

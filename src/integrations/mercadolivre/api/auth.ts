@@ -19,6 +19,18 @@ type MercadoLivreOAuthResponse = {
   user_id: number
 }
 
+// Mantém o token efetivamente usado pela sincronização de notas disponível
+// para as etapas seguintes do mesmo processo (por exemplo, pedidos).
+const accessTokens = new Map<string, string>()
+
+export function getCachedAccessToken(clienteId: string): string | undefined {
+  return accessTokens.get(clienteId)
+}
+
+export function cacheAccessToken(clienteId: string, accessToken: string): void {
+  accessTokens.set(clienteId, accessToken)
+}
+
 export async function refreshAccessToken(
   params: RefreshAccessTokenParams
 ): Promise<string> {
@@ -47,6 +59,7 @@ export async function refreshAccessToken(
       clienteId
     })
 
+    cacheAccessToken(clienteId, response.data.access_token)
     return response.data.access_token
   } catch (err) {
     const error = err as AxiosError<any>

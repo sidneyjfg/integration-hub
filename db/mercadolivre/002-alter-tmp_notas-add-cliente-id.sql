@@ -1,0 +1,2 @@
+ALTER TABLE tmp_notas
+  ADD COLUMN cliente_id VARCHAR(100) DEFAULT NULL;

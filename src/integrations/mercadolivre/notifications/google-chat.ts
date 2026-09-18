@@ -14,6 +14,10 @@ type GoogleChatMessage =
       sections?: unknown[];
     };
 
+function resolveWebhookUrl(specificUrl?: string): string | undefined {
+  return specificUrl || coreConfig.GOOGLE_CHAT_WEBHOOK_URL;
+}
+
 /**
  * 📣 Envia notificação para Google Chat
  * - string → mensagem simples
@@ -60,7 +64,7 @@ export async function notifyGoogleChat(
 export async function notifyGoogleChatWarning(
   message: GoogleChatMessage,
 ): Promise<void> {
-  const webhookUrl = coreConfig.GOOGLE_CHAT_WEBHOOK_URL_WARNING;
+  const webhookUrl = resolveWebhookUrl(coreConfig.GOOGLE_CHAT_WEBHOOK_URL_WARNING);
 
   if (!webhookUrl) {
     console.warn(
@@ -98,7 +102,7 @@ export async function notifyGoogleChatWarning(
 export async function notifyGoogleChatError(
   message: GoogleChatMessage,
 ): Promise<void> {
-  const webhookUrl = coreConfig.GOOGLE_CHAT_WEBHOOK_URL_ERROR;
+  const webhookUrl = resolveWebhookUrl(coreConfig.GOOGLE_CHAT_WEBHOOK_URL_ERROR);
 
   if (!webhookUrl) {
     console.warn(
