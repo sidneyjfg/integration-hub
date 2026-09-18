@@ -20,6 +20,7 @@ export type PeriodoNotasMercadoLivre = {
 export type PedidoSemValorPedido = {
   pedido: string
   emissao: string
+  serie?: string
   clienteId?: string
 }
 
@@ -230,11 +231,13 @@ export async function verificarECriarTabelaTmpNotas(): Promise<void> {
 export async function buscarPedidosSemValorPedido(
   inicio: string,
   fim: string,
+  serie?: string,
 ): Promise<PedidoSemValorPedido[]> {
   const sql = `
     SELECT TRIM(venda_remesa) AS pedido,
            MAX(emissao) AS emissao,
-           MAX(cliente_id) AS clienteId
+           serie,
+           cliente_id AS clienteId
       FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
      WHERE tipo_logistico = 'Fulfillment'
        AND emissao >= ?
@@ -244,13 +247,16 @@ export async function buscarPedidosSemValorPedido(
        AND TRIM(venda_remesa) <> ''
        AND valor_pedido IS NULL
        AND TRIM(venda_remesa) REGEXP '^2000[0-9]+$'
-     GROUP BY TRIM(venda_remesa)
+       ${serie ? 'AND serie = ?' : ''}
+     GROUP BY TRIM(venda_remesa), serie, cliente_id
   `
-  const [rows] = await poolMonitoramento.query(sql, [inicio, fim])
+  const params = serie ? [inicio, fim, serie] : [inicio, fim]
+  const [rows] = await poolMonitoramento.query(sql, params)
   return (rows as any[])
     .map(row => ({
       pedido: String(row.pedido),
       emissao: String(row.emissao ?? ''),
+      serie: row.serie ? String(row.serie) : undefined,
       clienteId: row.clienteId ? String(row.clienteId) : undefined,
     }))
     .filter(row => row.pedido)
@@ -259,14 +265,27 @@ export async function buscarPedidosSemValorPedido(
 export async function salvarValorPedido(
   pedido: string,
   valor: number,
+  filtros?: { serie?: string; clienteId?: string },
 ): Promise<number> {
+  const conditions = ['venda_remesa = ?', "tipo_logistico = 'Fulfillment'"]
+  const params: Array<string | number> = [valor, pedido]
+
+  if (filtros?.serie) {
+    conditions.push('serie = ?')
+    params.push(filtros.serie)
+  }
+
+  if (filtros?.clienteId) {
+    conditions.push('cliente_id = ?')
+    params.push(filtros.clienteId)
+  }
+
   const sql = `
     UPDATE ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
        SET valor_pedido = ?
-     WHERE venda_remesa = ?
-       AND tipo_logistico = 'Fulfillment'
+     WHERE ${conditions.join(' AND ')}
   `
-  const [result] = await poolMonitoramento.execute(sql, [valor, pedido])
+  const [result] = await poolMonitoramento.execute(sql, params)
   return Number((result as any).affectedRows ?? 0)
 }
 

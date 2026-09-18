@@ -90,4 +90,32 @@ export default async function buscaCsRoutes(app: FastifyInstance) {
       })
     }
   })
+
+  app.post('/pedidos/serie', async (req, reply) => {
+    try {
+      const body = (req.body ?? {}) as any
+      const serie = String(body.serie ?? '').trim()
+      if (!serie) {
+        return reply.code(400).send({ erro: 'Informe a série' })
+      }
+
+      const periodo = validarIntervalo(body.inicio, body.fim)
+      const resultado = await buscarValoresPedidosMercadoLivre(
+        periodo.inicio,
+        periodo.fimExclusivo,
+        serie,
+      )
+
+      return {
+        modo: 'preenchimento-pedidos-por-serie',
+        serie,
+        periodo: { inicio: periodo.inicio, fim: periodo.fim },
+        ...resultado,
+      }
+    } catch (error: any) {
+      return reply.code(400).send({
+        erro: error?.message ?? 'Não foi possível preencher os pedidos da série',
+      })
+    }
+  })
 }

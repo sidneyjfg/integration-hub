@@ -69,8 +69,9 @@ async function consultarPedido(
 export async function buscarValoresPedidosMercadoLivre(
   inicio: string,
   fim: string,
+  serie?: string,
 ): Promise<ResultadoBuscaPedidos> {
-  const pedidos = await buscarPedidosSemValorPedido(inicio, fim)
+  const pedidos = await buscarPedidosSemValorPedido(inicio, fim, serie)
   const credenciais = await buscarCredenciaisMercadoLivre()
   const tokens = new Map<string, string>()
   const resultado: ResultadoBuscaPedidos = {
@@ -110,7 +111,11 @@ export async function buscarValoresPedidosMercadoLivre(
         }
 
         resultado.encontrados++
-        resultado.atualizados += await salvarValorPedido(pedido, Number(valor.toFixed(2)))
+        resultado.atualizados += await salvarValorPedido(
+          pedido,
+          Number(valor.toFixed(2)),
+          { serie: item.serie, clienteId: item.clienteId },
+        )
         if (item.emissao) resultado.diasAlterados.push(item.emissao)
         encontrado = true
         break
@@ -131,6 +136,7 @@ export async function buscarValoresPedidosMercadoLivre(
   console.log('[MERCADOLIVRE][PEDIDOS] Enriquecimento finalizado', {
     inicio,
     fim,
+    serie: serie ?? null,
     pedidos: pedidos.length,
     ...resultado,
   })
