@@ -34,6 +34,94 @@ type BuscarNotasResult = {
 const delay = (ms: number) =>
   new Promise(resolve => setTimeout(resolve, ms))
 
+const MAX_ZIP_DOWNLOAD_ATTEMPTS = 3
+
+function isRetryableZipError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+
+  return /bad archive|arquivo zip inv[aá]lido|zip vazio|incompleto|archive read error|unexpected end/i.test(
+    message
+  )
+}
+
+async function baixarEExtrairZip(
+  url: string,
+  headers: { Authorization: string },
+  zipPath: string,
+  outputDir: string,
+  xmlDir: string,
+  clienteId: string,
+  includeOtherErp: boolean
+): Promise<string[]> {
+  let ultimoErro: unknown
+
+  for (let tentativa = 1; tentativa <= MAX_ZIP_DOWNLOAD_ATTEMPTS; tentativa++) {
+    const temporaryZipPath = `${zipPath}.${process.pid}.${Date.now()}.${tentativa}.part`
+
+    try {
+      console.log('[MERCADOLIVRE][DOWNLOAD] Iniciando ZIP', {
+        clienteId,
+        tentativa,
+        totalTentativas: MAX_ZIP_DOWNLOAD_ATTEMPTS
+      })
+
+      const response = await axios.get(url, {
+        headers,
+        responseType: 'stream'
+      })
+
+      console.log('[MERCADOLIVRE][DOWNLOAD] Status', {
+        clienteId,
+        tentativa,
+        status: response.status,
+        contentType: response.headers?.['content-type'],
+        contentLength: response.headers?.['content-length']
+      })
+
+      await pipeline(response.data, fs.createWriteStream(temporaryZipPath))
+
+      const zipStats = await fs.promises.stat(temporaryZipPath)
+      if (zipStats.size < 4) {
+        throw new Error(`ZIP vazio ou incompleto (${zipStats.size} bytes)`)
+      }
+
+      // O nome final só passa a existir depois que o download terminou.
+      await fs.promises.rename(temporaryZipPath, zipPath)
+
+      console.log('[MERCADOLIVRE][ZIP] Download finalizado', {
+        clienteId,
+        zipPath,
+        bytes: zipStats.size,
+        tentativa
+      })
+
+      return await extractAllFiles(zipPath, outputDir, includeOtherErp)
+    } catch (error) {
+      ultimoErro = error
+
+      await fs.promises.rm(temporaryZipPath, { force: true }).catch(() => {})
+
+      if (!isRetryableZipError(error) || tentativa === MAX_ZIP_DOWNLOAD_ATTEMPTS) {
+        throw error
+      }
+
+      console.warn('[MERCADOLIVRE][ZIP] Arquivo inválido; repetindo download', {
+        clienteId,
+        tentativa,
+        erro: error instanceof Error ? error.message : String(error)
+      })
+
+      // Remove o ZIP e eventuais XMLs extraídos parcialmente antes da tentativa seguinte.
+      await deleteFiles(zipPath, xmlDir)
+      await delay(1000 * tentativa)
+    }
+  }
+
+  throw ultimoErro instanceof Error
+    ? ultimoErro
+    : new Error('Não foi possível baixar o ZIP do Mercado Livre')
+}
+
 export async function buscarNotasMercadoLivre(
   params: BuscarNotasParams
 ): Promise<BuscarNotasResult> {
@@ -86,32 +174,13 @@ export async function buscarNotasMercadoLivre(
     await deleteFiles(zipPath, xmlDir)
     await fs.promises.mkdir(outputDir, { recursive: true })
 
-    console.log('[MERCADOLIVRE][DOWNLOAD] Iniciando ZIP', { clienteId })
-
-    const response = await axios.get(url, {
+    const extractedFiles = await baixarEExtrairZip(
+      url,
       headers,
-      responseType: 'stream'
-    })
-
-    console.log('[MERCADOLIVRE][DOWNLOAD] Status', {
-      clienteId,
-      status: response.status,
-      contentType: response.headers?.['content-type'],
-      contentLength: response.headers?.['content-length']
-    })
-
-    await pipeline(response.data, fs.createWriteStream(zipPath))
-
-    const zipStats = await fs.promises.stat(zipPath)
-
-    console.log('[MERCADOLIVRE][ZIP] Download finalizado', {
-      zipPath,
-      bytes: zipStats.size
-    })
-
-    const extractedFiles = await extractAllFiles(
       zipPath,
       outputDir,
+      xmlDir,
+      clienteId,
       MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP
     )
 
