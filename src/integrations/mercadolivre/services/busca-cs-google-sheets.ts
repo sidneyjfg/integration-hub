@@ -47,6 +47,11 @@ function dataAnterior(ano: number, mes: number, dia: number): string {
   return `${data.getUTCFullYear()}${String(data.getUTCMonth() + 1).padStart(2, '0')}${String(data.getUTCDate()).padStart(2, '0')}`
 }
 
+export function resolverD1Atual(): string {
+  const hoje = agoraEmSaoPaulo()
+  return dataAnterior(hoje.ano, hoje.mes, hoje.dia)
+}
+
 export function resolverPeriodoD1(d1: string) {
   if (!/^\d{8}$/.test(d1)) throw new Error('D-1 deve estar no formato YYYYMMDD')
   const data = new Date(Date.UTC(Number(d1.slice(0, 4)), Number(d1.slice(4, 6)) - 1, Number(d1.slice(6, 8))))
@@ -170,7 +175,7 @@ export async function executarBuscaCS(d1?: string, diasParaAtualizar?: string[])
   const { spreadsheetId, auth } = credenciaisSheets()
   const api = google.sheets({ version: 'v4', auth })
   const hoje = agoraEmSaoPaulo()
-  const referencia = resolverPeriodoD1(d1 ?? dataAnterior(hoje.ano, hoje.mes, hoje.dia))
+  const referencia = resolverPeriodoD1(d1 ?? resolverD1Atual())
   const { ano, mes, diaApuracao, inicio, fim, diasNoMes } = referencia
   const resumos = await buscarResumoDiarioBuscaCS(inicio, fim, diasNoMes)
   const abaNotas = nomeAba(ano, mes, 'Notas')

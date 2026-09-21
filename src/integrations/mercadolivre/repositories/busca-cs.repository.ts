@@ -136,10 +136,12 @@ export async function buscarResumoDiarioBuscaCS(
   const resultado: ResumoDiarioBuscaCS[] = []
 
   for (let diaApuracao = 1; diaApuracao <= diasNoMes; diaApuracao++) {
-    const diaAnterior = porDia.get(diaApuracao - 1)
-    if (diaAnterior) {
-      totalNotas += diaAnterior.chaves.size
-      valorBruto += diaAnterior.valor
+    // A execução do dia seguinte fecha o dia anterior:
+    // no dia 02, a linha do dia 01 recebe o acumulado até o dia 01.
+    const diaAtual = porDia.get(diaApuracao)
+    if (diaAtual) {
+      totalNotas += diaAtual.chaves.size
+      valorBruto += diaAtual.valor
     }
 
     resultado.push({

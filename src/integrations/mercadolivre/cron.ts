@@ -28,11 +28,12 @@ export async function executarCronBuscaCS() {
 
   buscaCSRunning = true
   try {
-    const { executarBuscaCS } = await import('./services/busca-cs-google-sheets.js')
+    const { executarBuscaCS, resolverD1Atual } = await import('./services/busca-cs-google-sheets.js')
     const { notifyGoogleChat, notifyGoogleChatError } = await import('./notifications/google-chat.js')
 
     try {
-      const resultado = await executarBuscaCS()
+      const d1 = resolverD1Atual()
+      const resultado = await executarBuscaCS(d1, [d1])
       await notifyGoogleChat(`[BUSCA-CS] Planilha atualizada. Aba: ${resultado.aba}. Dia de apuração: ${resultado.dataApuracao}. Período: ${resultado.inicio} até ${resultado.fim}. Total de notas: ${resultado.totalNotas}. Valor bruto: ${resultado.valorBruto}.`)
     } catch (error: any) {
       await notifyGoogleChatError(`[BUSCA-CS] Erro ao atualizar o Google Sheets. Os últimos dados corretos foram preservados. Detalhe: ${error?.message ?? 'erro desconhecido'}`)
