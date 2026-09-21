@@ -42,13 +42,14 @@ export async function buscarResumoBuscaCS(
       SELECT
         chave,
         MAX(
-          COALESCE(
-            valor_pedido,
-            CASE
-              WHEN operacao IN (?, ?) THEN CAST(REPLACE(valor, ',', '.') AS DECIMAL(18, 2))
-              ELSE 0
-            END
-          )
+          CASE
+            WHEN COALESCE(status, '') = 'Cancelada' THEN 0
+            WHEN operacao IN (?, ?) THEN COALESCE(
+              valor_pedido,
+              CAST(REPLACE(valor, ',', '.') AS DECIMAL(18, 2))
+            )
+            ELSE 0
+          END
         ) AS valorBruto
       FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
       WHERE tipo_logistico = ?
@@ -90,13 +91,14 @@ export async function buscarResumoDiarioBuscaCS(
         MAX(emissao) AS emissao,
         chave,
         MAX(
-          COALESCE(
-            valor_pedido,
-            CASE
-              WHEN operacao IN (?, ?) THEN CAST(REPLACE(valor, ',', '.') AS DECIMAL(18, 2))
-              ELSE 0
-            END
-          )
+          CASE
+            WHEN COALESCE(status, '') = 'Cancelada' THEN 0
+            WHEN operacao IN (?, ?) THEN COALESCE(
+              valor_pedido,
+              CAST(REPLACE(valor, ',', '.') AS DECIMAL(18, 2))
+            )
+            ELSE 0
+          END
         ) AS valor
       FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
       WHERE tipo_logistico = ?
