@@ -1,7 +1,7 @@
 import cron from 'node-cron'
 import { runPedidosCron } from './pedidos.cron'
 import { runProdutosCron } from './produtos.cron'
-import { runEtiquetaCron, runNotasMLCron } from './notas-ml.cron'
+import { runBuscaCSCron, runEtiquetaCron, runNotasMLCron } from './notas-ml.cron'
 import { runNotasMLSFTPCron } from './notas-ml-sftp.cron'
 import { CoreEnv } from '../env.schema'
 import { enfileirarCron } from '../../shared/cron-queue'
@@ -34,6 +34,16 @@ export function registerCrons(coreConfig: CoreEnv) {
   if (coreConfig.USA_ETIQUETA) {
     cron.schedule(coreConfig.USA_ETIQUETA, () =>
       enfileirarCron('etiqueta', runEtiquetaCron)
+    )
+  }
+
+  if (coreConfig.ATIVA_BUSCA_CS) {
+    if (!cron.validate(coreConfig.ATIVA_BUSCA_CS)) {
+      throw new Error('ATIVA_BUSCA_CS deve conter uma expressão cron válida ou ficar vazia para desativar')
+    }
+
+    cron.schedule(coreConfig.ATIVA_BUSCA_CS, () =>
+      enfileirarCron('busca CS', runBuscaCSCron)
     )
   }
 }

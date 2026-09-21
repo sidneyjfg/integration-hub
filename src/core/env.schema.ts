@@ -31,7 +31,8 @@ export const coreEnvSchema = z.object({
   CRON_PRODUTOS: z.string().optional(),
   CRON_NOTAS_ML: z.string().optional(),
   CRON_NOTAS_SFTP: z.string().optional(),
-  ATIVA_BUSCA_CS: z.preprocess(toBool, z.boolean().default(false)),
+  // Expressão cron da atualização da Busca CS. Vazio desativa.
+  ATIVA_BUSCA_CS: z.preprocess(emptyToUndefined, z.string().optional()),
   GOOGLE_SHEETS_SPREADSHEET_ID: z.string().optional(),
   GOOGLE_SHEETS_CREDENTIALS_FILE: z.string().optional(),
   USA_ETIQUETA: z.preprocess(emptyToUndefined, z.string().optional()),

@@ -19,6 +19,7 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | `CRON_PRODUTOS` | Agenda o cron de produtos. | Use uma expressao cron valida ou deixe vazio. |
 | `CRON_NOTAS_ML` | Agenda a sincronizacao normal do Mercado Livre. | Use uma expressao cron valida ou deixe vazio. |
 | `CRON_NOTAS_SFTP` | Agenda a sincronizacao SFTP do Mercado Livre. | Use uma expressao cron valida ou deixe vazio. |
+| `ATIVA_BUSCA_CS` | Agenda a busca e atualizacao da planilha CS do Mercado Livre. | Use uma expressao cron valida, ex: `*/15 * * * *`, ou deixe vazio para desativar. A cada ciclo o D-1 e reprocessado de forma idempotente. |
 | `USA_ETIQUETA` | Agenda o cron de etiqueta. | Use uma expressao cron valida ou deixe vazio. |
 | `GOOGLE_CHAT_WEBHOOK_URL` | Envia notificacoes para o Google Chat. | Informe a URL completa do webhook. |
 | `GOOGLE_CHAT_WEBHOOK_URL_WARNING` | Envia notificacoes de aviso para o Google Chat. | Informe a URL completa do webhook ou deixe vazio. |

@@ -18,3 +18,11 @@ export async function runEtiquetaCron() {
 
   await executarCronPorHub('mercadolivre', coreConfig, 'etiqueta')
 }
+
+export async function runBuscaCSCron() {
+  const active = getActiveHubs()
+
+  if (!active.includes('mercadolivre')) return
+
+  await executarCronPorHub('mercadolivre', coreConfig, 'buscaCS')
+}
