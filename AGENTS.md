@@ -78,8 +78,9 @@ no AWS.
 exportada por cada um (`export = async function run()`, asserting com `node:assert/strict`). Um teste
 novo nunca roda até ser adicionado nessa lista. Os testes usam mocks de pool e de API via
 `tests/helpers/module-loader.ts` e env fixo de `tests/helpers/*-env.ts` — é por isso que eles rodam
-offline. Nada disso substitui o teste no AWS. (`tests/teste.ts` não é teste: é um inspector manual
-de `natOp` de XML que roda sobre `./`.)
+offline. Nada disso substitui o teste no AWS. Em `tests/` há arquivos soltos que **não são teste** e
+nunca rodam: `tests/teste.ts` (inspector manual de `natOp` de XML sobre `./`) e
+`tests/busca-pedidos.js` (script manual).
 
 ## Env é validado no import (a maior pegadinha do repo)
 
@@ -144,10 +145,10 @@ importa**) e, para cada token:
 - O SFTP do ML grava em `./notas/normal`, `./notas/sftp` e `./ledger`, relativos ao CWD (estão no
   `.gitignore`). São arquivos de cliente: não versione e não apague sem autorização.
 - `.gitignore` também ignora `core` — cuidado com arquivos com esse nome.
-- Já existem segredos reais commitados: token do ML em `busca-pedidos.js` (script órfão, exclusivo
-  da `develop` — não existe no `master`, ninguém referencia, não entra no build nem na imagem) e
-  webhook do Google Chat em `tests/helpers/mercadolivre-env.ts`. **Não copie, não reutilize e não
-  adicione novos segredos ao repo.**
+- Já existem segredos reais commitados: token do ML em `tests/busca-pedidos.js` (script órfão,
+  exclusivo da `develop` — não existe no `master`, ninguém referencia, o runner não pega e não entra
+  no build nem na imagem) e webhook do Google Chat em `tests/helpers/mercadolivre-env.ts`. **Não
+  copie, não reutilize e não adicione novos segredos ao repo.**
 
 ## Deploy
 
