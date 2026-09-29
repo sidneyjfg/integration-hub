@@ -1,8 +1,10 @@
 // src/integrations/traycommerce/repositories/pedidos.repository.ts
 import { poolMonitoramento } from '../../../core/db'
 import { coreConfig } from '../../../core/env.schema'
-import { TraycommerceOrderApi } from '../../../shared/types/traycommerce'
-import { PedidoNaoIntegradoTraycommerce } from '../../../shared/types/traycommerce'
+import {
+  PedidoNaoIntegradoTraycommerce,
+  TraycommerceOrderApi
+} from '../../../shared/types/traycommerce'
 
 export async function salvarPedidosTempTraycommerce(
   pedidos: TraycommerceOrderApi[]
@@ -21,15 +23,26 @@ export async function salvarPedidosTempTraycommerce(
     INSERT INTO ${coreConfig.DB_NAME_MONITORAMENTO}.temp_orders_traycommerce (
       ordnoweb,
       ordnochannel,
+
       status,
+      status_name,
+
       nfe_key,
+
+      total,
+
       date
     )
-    VALUES (?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       ordnochannel = VALUES(ordnochannel),
+
       status = VALUES(status),
-      nfe_key = VALUES(nfe_key)
+      status_name = VALUES(status_name),
+
+      nfe_key = VALUES(nfe_key),
+
+      total = VALUES(total)
   `
 
   let salvos = 0
@@ -40,15 +53,36 @@ export async function salvarPedidosTempTraycommerce(
       continue
     }
 
-    const v = <T>(value: T | undefined | null): T | null =>
-      value === undefined ? null : value
+    const invoices = Array.isArray(o.OrderInvoice) ? o.OrderInvoice : []
+    if (invoices.length) {
+      // A loja de homologacao nao tem nota nenhuma, entao o nome do campo da
+      // chave ainda nao foi confirmado contra a API. Loga o bruto para o
+      // primeiro cliente real revelar o formato.
+      console.log(
+        `[TRAYCOMMERCE][SYNC][DB] Pedido ${o.id} com OrderInvoice:`,
+        JSON.stringify(invoices)
+      )
+    }
 
     await poolMonitoramento.execute(sql, [
+      // a TrayCommerce manda o id como string ("77")
       String(o.id),
-      v(o.reference) ?? String(o.id),
-      v(o.OrderStatus?.id !== undefined ? String(o.OrderStatus.id) : null) ?? '',
+      // external_code e a unica referencia do canal no pedido; fica vazia
+      // quando a integracao nao escreve nesse campo
+      o.external_code ?? '',
+
+      String(o.OrderStatus?.id ?? ''),
+      o.OrderStatus?.status ?? null,
+
       null,
-      o.creation_date ? new Date(o.creation_date) : new Date()
+
+      // total vem como string na API ("1000.00")
+      o.total === undefined || o.total === null || o.total === ''
+        ? null
+        : Number(o.total),
+
+      // date e YYYY-MM-DD; o fallback evita gravar data invalida
+      parseDateTraycommerce(o.date) ?? new Date()
     ])
 
     salvos++
@@ -60,19 +94,38 @@ export async function salvarPedidosTempTraycommerce(
   )
 }
 
+/**
+ * A API devolve só a data (YYYY-MM-DD), sem hora e sem fuso. Montar a
+ * meia-noite local evita que o UTC puxe o valor para o dia anterior.
+ */
+function parseDateTraycommerce(date: string | null | undefined): Date | null {
+  if (!date) return null
+
+  const partes = /^(\d{4})-(\d{2})-(\d{2})/.exec(date)
+  if (!partes) return null
+
+  const [, ano, mes, dia] = partes
+  const resultado = new Date(Number(ano), Number(mes) - 1, Number(dia))
+
+  return Number.isNaN(resultado.getTime()) ? null : resultado
+}
+
 export async function buscarPedidosNaoIntegradosTraycommerce(): Promise<
   PedidoNaoIntegradoTraycommerce[]
 > {
   console.log('[TRAYCOMMERCE][SYNC][DB] Buscando pedidos não integrados')
 
-  // eordchannelp não tem status: entra o eord para tratar pedido cancelado
-  // (status 4 e 5) como não integrado.
+  // Mesmo desenho do Pluggto: eordchannelp liga o pedido da TrayCommerce ao
+  // ERP. Sem o join em eord de proposito - loja de site proprio nao
+  // acompanha pedido cancelado, e o status so existe na outra tabela.
   const sql = `
   SELECT
     t.ordnoweb,
     t.ordnochannel,
     t.status,
+    t.status_name,
     DATE_FORMAT(t.date, '%d/%m/%Y %H:%i:%s') AS date,
+    t.total,
     t.nfe_key
   FROM ${coreConfig.DB_NAME_MONITORAMENTO}.temp_orders_traycommerce t
   LEFT JOIN ${coreConfig.DB_NAME_DADOS}.eordchannelp e
@@ -81,12 +134,7 @@ export async function buscarPedidosNaoIntegradosTraycommerce(): Promise<
      .split(',')
      .map(s => `'${s.trim()}'`)
      .join(',')})
-  LEFT JOIN ${coreConfig.DB_NAME_DADOS}.eord r
-    ON r.ordno = e.ordno
-   AND r.storeno = e.storeno
   WHERE e.ordnoweb IS NULL
-     OR r.status IS NULL
-     OR r.status IN (4, 5)
   ORDER BY t.date DESC
 `
 

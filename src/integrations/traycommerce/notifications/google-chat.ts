@@ -92,13 +92,20 @@ export async function notifyGoogleChatWarning(
 export function formatarLinhaPedido(p: {
   ordnoweb: string;
   status: string;
+  status_name?: string | null;
   date: string;
+  total?: number | null;
   ordnochannel?: string | null;
 }) {
+  const status = p.status_name
+    ? `${p.status_name} (${p.status})`
+    : p.status;
+
   return (
     `• Pedido: ${p.ordnoweb}\n` +
-    `  Status: ${p.status}\n` +
+    `  Status: ${status}\n` +
     `  Data: ${p.date}\n` +
-    `  Canal: ${p.ordnochannel ?? "—"}`
+    `  Total: ${p.total === null || p.total === undefined ? "—" : p.total}\n` +
+    `  Canal: ${p.ordnochannel || "—"}`
   );
 }
