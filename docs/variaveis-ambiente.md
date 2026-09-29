@@ -82,3 +82,16 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | --- | --- | --- |
 | `TRAY_URL` | Base da API TrayCorp. | Informe a URL completa. |
 | `TRAY_TOKEN` | Token usado nas chamadas da API. | Informe um token com pelo menos 10 caracteres. |
+
+## TrayCommerce
+
+Hub novo, separado do `TRAYCORP` (que continua atendendo a Wake).
+
+| Variavel | Para que serve | Como usar |
+| --- | --- | --- |
+| `TRAYCOMMERCE_URL` | Base da API TrayCommerce. | Informe a URL completa. |
+| `TRAYCOMMERCE_CONSUMER_KEY` | Consumer key da aplicacao. | Informe a consumer key. |
+| `TRAYCOMMERCE_SECRET_KEY` | Consumer secret da aplicacao. | Informe o consumer secret. |
+| `TRAYCOMMERCE_CODE` | Codigo da loja para autenticacao. | Informe o codigo da loja. |
+| `TRAYCOMMERCE_STORE_ID` | Id da loja usado nas consultas. | Informe o store id. |
+| `TRAYCOMMERCE_ORDER_STATUS_TO_GET` | Status (ids) monitorados na busca de pedidos. | Separe por virgula, ex: `1,350,317`. |

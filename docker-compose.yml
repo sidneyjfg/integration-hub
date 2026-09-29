@@ -97,6 +97,15 @@ services:
       TRAY_URL: https://api.tray.com.br
       TRAY_TOKEN: ""
 
+      # TRAYCOMMERCE
+      TRAYCOMMERCE_URL: ""
+      TRAYCOMMERCE_CONSUMER_KEY: ""
+      TRAYCOMMERCE_SECRET_KEY: ""
+      TRAYCOMMERCE_CODE: ""
+      TRAYCOMMERCE_STORE_ID: ""
+      # Status (ids) monitorados, separados por virgula
+      TRAYCOMMERCE_ORDER_STATUS_TO_GET: ""
+
       PORT: 3000
       TZ: America/Sao_Paulo
     secrets:
