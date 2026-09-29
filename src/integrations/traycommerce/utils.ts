@@ -2,7 +2,9 @@
 
 /**
  * Janela de busca de pedidos.
- * Segunda-feira volta 3 dias para cobrir o fim de semana; nos demais dias, 1 dia.
+ * Segunda-feira volta 3 dias para cobrir sexta, sabado e domingo; nos demais
+ * dias, 1 dia. O fim sempre e o dia atual, para o que entra depois do cron
+ * nao ficar de fora: o ciclo seguinte repete o dia anterior.
  * O dia da semana usa o fuso do container (TZ: America/Sao_Paulo no compose).
  */
 export function getDateRange() {
@@ -12,12 +14,9 @@ export function getDateRange() {
   const fromDate = new Date(today)
   fromDate.setDate(today.getDate() - daysToFetch)
 
-  const toDate = new Date(today)
-  toDate.setDate(today.getDate() - 1)
-
   return {
     from: formatTrayDate(fromDate),
-    to: formatTrayDate(toDate)
+    to: formatTrayDate(today)
   }
 }
 
