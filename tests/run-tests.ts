@@ -57,6 +57,18 @@ const tests: TestCase[] = [
   {
     name: 'integration: pluggto ignora status configurados',
     file: path.resolve(__dirname, 'pluggto/sincronizar-pedidos-status-ignorados.integration.test.ts')
+  },
+  {
+    name: 'unit: traycommerce build-pedidos-notification',
+    file: path.resolve(__dirname, 'traycommerce/build-pedidos-notification.test.ts')
+  },
+  {
+    name: 'integration: traycommerce salvar-pedidos',
+    file: path.resolve(__dirname, 'traycommerce/salvar-pedidos.integration.test.ts')
+  },
+  {
+    name: 'integration: traycommerce pedidos nao integrados',
+    file: path.resolve(__dirname, 'traycommerce/sincronizar-pedidos-nao-integrados.integration.test.ts')
   }
 ]
 
