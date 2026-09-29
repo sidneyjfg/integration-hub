@@ -11,7 +11,13 @@ const RATE_LIMIT = 120
 const WINDOW_MS = 60000
 const TIMEOUT_MS = 15000
 const MAX_TENTATIVAS = 5
-const LIMITE_POR_PAGINA = 100
+const BASE_DELAY_MS = 1000
+const JITTER_MS = 500
+// A API aceita mais, mas corta o que vem acima de 50; 50 evita mandar inutil.
+const LIMITE_POR_PAGINA = 50
+
+// 408 e 5xx sao transitórios, igual ao retry do nerus-sync-hub
+const STATUS_RETRYABLES = new Set([408, 429, 500, 502, 503, 504])
 
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
@@ -58,11 +64,12 @@ export async function getAccessToken(): Promise<string> {
 }
 
 /**
- * 🔁 Busca uma página com retry e backoff (429)
+ * 🔁 Busca uma página com retry e backoff.
+ * A TrayCommerce responde 429 quando o limite de chamadas estoura, mas
+ * 5xx e 408 também são transitórios, então entram no mesmo retry.
  */
 async function buscarPaginaComRetry(
   urlFinal: string,
-  token: string,
   pagina: number
 ) {
   let tentativas = 0
@@ -71,10 +78,7 @@ async function buscarPaginaComRetry(
     try {
       const response: AxiosResponse<TraycommerceOrdersApiResponse> =
         await axios.get(urlFinal, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json'
-          },
+          headers: { Accept: 'application/json' },
           timeout: TIMEOUT_MS
         })
 
@@ -82,9 +86,9 @@ async function buscarPaginaComRetry(
     } catch (erro: any) {
       const status = erro.response?.status
 
-      if (status !== 429) {
+      if (!STATUS_RETRYABLES.has(status)) {
         console.error(
-          `[TRAYCOMMERCE][SYNC] Erro na página ${pagina}`,
+          `[TRAYCOMMERCE][SYNC] Erro na página ${pagina} (HTTP ${status})`,
           erro.message
         )
         throw erro
@@ -93,15 +97,21 @@ async function buscarPaginaComRetry(
       tentativas++
 
       if (tentativas > MAX_TENTATIVAS) {
-        throw new Error('Rate limit persistente na TrayCommerce')
+        throw new Error(
+          `Rate limit persistente na TrayCommerce (HTTP ${status}) após ${MAX_TENTATIVAS} tentativas`
+        )
       }
 
-      const backoff = Math.min(60, 5 * Math.pow(2, tentativas))
+      // Mesma curva do nerus-sync-hub: 1s, 2s, 4s... com um jitter aleatório.
+      const backoff =
+        BASE_DELAY_MS * Math.pow(2, tentativas - 1) +
+        Math.floor(Math.random() * JITTER_MS)
+
       console.log(
-        `[TRAYCOMMERCE][SYNC] Rate limit (429). Tentativa ${tentativas}/${MAX_TENTATIVAS}. Aguardando ${backoff}s`
+        `[TRAYCOMMERCE][SYNC] HTTP ${status} transitório. Tentativa ${tentativas}/${MAX_TENTATIVAS}. Aguardando ${backoff}ms`
       )
 
-      await sleep(backoff * 1000)
+      await sleep(backoff)
     }
   }
 }
@@ -140,6 +150,8 @@ export async function buscarPedidosTraycommerce(): Promise<
   let inicioJanela = Date.now()
   let ignorados = 0
 
+  const base = traycommerceConfig.TRAYCOMMERCE_URL.replace(/\/+$/, '')
+
   try {
     while (true) {
       const agora = Date.now()
@@ -158,20 +170,24 @@ export async function buscarPedidosTraycommerce(): Promise<
         continue
       }
 
+      // O access_token vai na query: a API ignora o header Authorization e
+      // devolve 401 "Invalid or expired token" quando so ele é enviado.
       const urlFinal =
-        `${traycommerceConfig.TRAYCOMMERCE_URL.replace(/\/+$/, '')}/orders` +
-        `?limit=${LIMITE_POR_PAGINA}&page=${pagina}&date=${from},${to}`
+        `${base}/orders?access_token=${token}` +
+        `&limit=${LIMITE_POR_PAGINA}&page=${pagina}&date=${from},${to}`
 
       console.log('[TRAYCOMMERCE][SYNC] Buscando página', { pagina, from, to })
 
       requisicoes++
 
-      const dados = await buscarPaginaComRetry(urlFinal, token, pagina)
+      const dados = await buscarPaginaComRetry(urlFinal, pagina)
       const lote = dados?.Orders || []
 
       console.log('[TRAYCOMMERCE][SYNC] Página recebida', {
         pagina,
-        registros: lote.length
+        registros: lote.length,
+        total: dados?.paging?.total,
+        limitEfetivo: dados?.paging?.limit
       })
 
       if (lote.length === 0) {

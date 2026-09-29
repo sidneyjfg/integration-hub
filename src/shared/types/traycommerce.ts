@@ -38,5 +38,7 @@ export interface TraycommerceOrdersApiResponse {
   paging?: {
     total?: number
     pages?: number
+    page?: number
+    limit?: number
   }
 }
