@@ -120,12 +120,19 @@ export type BuscarPedidosTraycommerceResumo = {
   totalPedidos: number
   ignorados: number
   statusIgnorados: string[]
+  /** Janela realmente consultada na API, em YYYYMMDD. A comparação no ERP
+   *  precisa do mesmo recorte, senao a contagem mistura pedidos de dias
+   *  diferentes e o alerta sai com "4 de 2". */
+  from: string
+  to: string
 }
 
 let ultimoResumoBuscaPedidos: BuscarPedidosTraycommerceResumo = {
   totalPedidos: 0,
   ignorados: 0,
-  statusIgnorados: Array.from(STATUS_MONITORADOS)
+  statusIgnorados: Array.from(STATUS_MONITORADOS),
+  from: '',
+  to: ''
 }
 
 export function getUltimoResumoBuscaPedidosTraycommerce(): BuscarPedidosTraycommerceResumo {
@@ -218,7 +225,9 @@ export async function buscarPedidosTraycommerce(): Promise<
     ultimoResumoBuscaPedidos = {
       totalPedidos: pedidos.length,
       ignorados,
-      statusIgnorados: Array.from(STATUS_MONITORADOS)
+      statusIgnorados: Array.from(STATUS_MONITORADOS),
+      from,
+      to
     }
 
     return pedidos

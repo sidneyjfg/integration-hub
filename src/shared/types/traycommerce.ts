@@ -16,7 +16,7 @@ export interface TraycommerceOrderBody {
   date: string
 }
 
-/** Pedido pendente de integração, como devolvido pela comparação com o ERP. */
+/** Pedido da janela consultada, como devolvido pela comparação com o ERP. */
 export type PedidoNaoIntegradoTraycommerce = {
   ordnoweb: string
   ordnochannel: string | null
@@ -25,6 +25,9 @@ export type PedidoNaoIntegradoTraycommerce = {
   date: string
   total: number | null
   nfe_key: string | null
+  /** 1 quando o pedido não foi encontrado no eordchannelp. O mysql2
+   *  devolve `(e.ordnoweb IS NULL)` como 0/1. */
+  nao_integrado: number
 }
 
 export interface TraycommerceOrderStatusApi {

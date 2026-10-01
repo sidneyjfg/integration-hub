@@ -18,6 +18,7 @@ export = async function runSincronizarPedidosNaoIntegradosTraycommerceIntegratio
   clearModules([repositoryModulePath, coreEnvModulePath, coreDbModulePath])
 
   const queries: string[] = []
+  const consultas: Array<{ sql: string; params: unknown[] }> = []
 
   const naoIntegrados = [
     {
@@ -26,15 +27,17 @@ export = async function runSincronizarPedidosNaoIntegradosTraycommerceIntegratio
       status: '1',
       status_name: 'A ENVIAR',
       date: '10/05/2022 00:00:00',
-      total: 1000,
-      nfe_key: null
+      total: '42.90',
+      nfe_key: null,
+      nao_integrado: 1
     }
   ]
 
   const dbMock = {
     poolMonitoramento: {
-      query: async (sql: string) => {
+      query: async (sql: string, params: unknown[]) => {
         queries.push(sql)
+        consultas.push({ sql, params })
         return [naoIntegrados]
       }
     }
@@ -45,7 +48,10 @@ export = async function runSincronizarPedidosNaoIntegradosTraycommerceIntegratio
       [coreDbModulePath]: dbMock
     })
 
-  const resultado = await buscarPedidosNaoIntegradosTraycommerce()
+  const resultado = await buscarPedidosNaoIntegradosTraycommerce({
+    from: '20220510',
+    to: '20220511'
+  })
 
   assert.equal(queries.length, 1)
   const sql = queries[0]
@@ -53,13 +59,25 @@ export = async function runSincronizarPedidosNaoIntegradosTraycommerceIntegratio
   assert.equal(resultado.length, 1)
   assert.equal(resultado[0].ordnoweb, '77')
   assert.equal(resultado[0].status_name, 'A ENVIAR')
-  assert.equal(resultado[0].total, 1000)
+  assert.equal(resultado[0].nao_integrado, 1)
+  // o mysql2 devolve DECIMAL como string; sem converter o card mostra
+  // 42.90 vindo de number e qualquer conta com total vira concatenacao
+  assert.equal(resultado[0].total, 42.9)
+  assert.equal(typeof resultado[0].total, 'number')
 
   // linkage pelo eordchannelp, como no Pluggto
   assert.match(sql, /temp_orders_traycommerce t/)
   assert.match(sql, /LEFT JOIN dados\.eordchannelp e/)
   assert.match(sql, /ON t\.ordnoweb = e\.ordnoweb/)
-  assert.match(sql, /WHERE e\.ordnoweb IS NULL/)
+
+  // A consulta traz a janela inteira com a flag, em vez de filtrar so os
+  // nao integrados no WHERE: e assim que os tres numeros do alerta saem
+  // da mesma fonte e nunca ficam inconsistentes entre si.
+  assert.doesNotMatch(
+    sql,
+    /WHERE[^]*?e\.ordnoweb IS NULL/,
+    'o filtro de nao integrado virou flag, nao WHERE'
+  )
 
   // loja de site proprio nao acompanha cancelado: eord nao entra na consulta
   // (o \b evita casar com eordchannelp, que continua sendo a ligacao correta)
@@ -77,4 +95,14 @@ export = async function runSincronizarPedidosNaoIntegradosTraycommerceIntegratio
 
   // a comparacao e por loja: o ERP tem uma entrada por storeno
   assert.match(sql, /e\.storeno IN \('1','2'\)/, 'precisa filtrar pelo STORENOS')
+
+  // a janela e obrigatoria: sem ela a tabela acumulada mistura dias e o
+  // alerta sai com "4 de 2"
+  assert.match(sql, /t\.date >= CONCAT\(\?, ' 00:00:00'\)/)
+  assert.match(sql, /INTERVAL 1 DAY/)
+  assert.deepEqual(consultas[0].params, ['20220510', '20220511'])
+  assert.match(sql, /ORDER BY t\.date ASC/, 'os mais antigos primeiro')
+
+  // o repositorio precisa devolver a flag para o service contar
+  assert.match(sql, /\(e\.ordnoweb IS NULL\) AS nao_integrado/)
 }

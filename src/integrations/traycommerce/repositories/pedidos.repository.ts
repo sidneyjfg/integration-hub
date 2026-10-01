@@ -110,14 +110,21 @@ function parseDateTraycommerce(date: string | null | undefined): Date | null {
   return Number.isNaN(resultado.getTime()) ? null : resultado
 }
 
-export async function buscarPedidosNaoIntegradosTraycommerce(): Promise<
-  PedidoNaoIntegradoTraycommerce[]
-> {
-  console.log('[TRAYCOMMERCE][SYNC][DB] Buscando pedidos não integrados')
+export async function buscarPedidosNaoIntegradosTraycommerce(
+  janela: { from: string; to: string }
+): Promise<PedidoNaoIntegradoTraycommerce[]> {
+  console.log('[TRAYCOMMERCE][SYNC][DB] Buscando pedidos não integrados', {
+    janela
+  })
 
   // Mesmo desenho do Pluggto: eordchannelp liga o pedido da TrayCommerce ao
   // ERP. Sem o join em eord de proposito - loja de site proprio nao
   // acompanha pedido cancelado, e o status so existe na outra tabela.
+  //
+  // A janela e a mesma que foi buscar na API. Sem esse recorte a tabela
+  // acumula pedido de todo dia e a contagem mistura janelas: 4 pendentes
+  // antigos com 2 verificados hoje dariam "4 de 2". O `to` compara com o
+  // dia seguinte em vez de 23:59:59 para nao depender do segundo exato.
   const sql = `
   SELECT
     t.ordnoweb,
@@ -126,7 +133,8 @@ export async function buscarPedidosNaoIntegradosTraycommerce(): Promise<
     t.status_name,
     DATE_FORMAT(t.date, '%d/%m/%Y %H:%i:%s') AS date,
     t.total,
-    t.nfe_key
+    t.nfe_key,
+    (e.ordnoweb IS NULL) AS nao_integrado
   FROM ${coreConfig.DB_NAME_MONITORAMENTO}.temp_orders_traycommerce t
   LEFT JOIN ${coreConfig.DB_NAME_DADOS}.eordchannelp e
     ON t.ordnoweb = e.ordnoweb
@@ -134,17 +142,40 @@ export async function buscarPedidosNaoIntegradosTraycommerce(): Promise<
      .split(',')
      .map(s => `'${s.trim()}'`)
      .join(',')})
-  WHERE e.ordnoweb IS NULL
-  ORDER BY t.date DESC
+  WHERE t.date >= CONCAT(?, ' 00:00:00')
+    AND t.date < DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 1 DAY)
+  ORDER BY t.date ASC
 `
 
-  const [rows] = await poolMonitoramento.query(sql)
+  const [rows] = await poolMonitoramento.query(sql, [janela.from, janela.to])
 
-  const result = rows as PedidoNaoIntegradoTraycommerce[]
+  // O mysql2 devolve DECIMAL como string: "42.90". O tipo declara number,
+  // então a linha chega com o tipo mentindo e precisa entrar como unknown
+  // para a conversao ser honesta.
+  const resultado = (
+    rows as Array<Omit<PedidoNaoIntegradoTraycommerce, 'total'> & {
+      total: unknown
+    }>
+  ).map(linha => ({
+    ...linha,
+    total: paraNumeroOuNulo(linha.total)
+  }))
 
   console.log('[TRAYCOMMERCE][SYNC][DB] Consulta finalizada', {
-    naoIntegrados: result.length
+    naJanela: resultado.length,
+    naoIntegrados: resultado.filter(l => l.nao_integrado === 1).length
   })
 
-  return result
+  return resultado
+}
+
+/** DECIMAL volta do mysql2 como string; Number('' ) é 0 e não null. */
+function paraNumeroOuNulo(valor: unknown): number | null {
+  if (valor === null || valor === undefined || valor === '') {
+    return null
+  }
+
+  const numero = Number(valor)
+
+  return Number.isNaN(numero) ? null : numero
 }
