@@ -5,6 +5,7 @@ import {
   PedidoNaoIntegradoTraycommerce,
   TraycommerceOrderApi
 } from '../../../shared/types/traycommerce'
+import { paraFimExclusivoSql, paraInicioDiaSql } from '../utils'
 
 export async function salvarPedidosTempTraycommerce(
   pedidos: TraycommerceOrderApi[]
@@ -123,8 +124,9 @@ export async function buscarPedidosNaoIntegradosTraycommerce(
   //
   // A janela e a mesma que foi buscar na API. Sem esse recorte a tabela
   // acumula pedido de todo dia e a contagem mistura janelas: 4 pendentes
-  // antigos com 2 verificados hoje dariam "4 de 2". O `to` compara com o
-  // dia seguinte em vez de 23:59:59 para nao depender do segundo exato.
+  // antigos com 2 verificados hoje dariam "4 de 2". O limite vai como
+  // datetime ja formatado porque a API fala YYYYMMDD e o MySQL fala
+  // YYYY-MM-DD: misturar os dois no SQL estoura ER_WRONG_VALUE 1525.
   const sql = `
   SELECT
     t.ordnoweb,
@@ -142,12 +144,15 @@ export async function buscarPedidosNaoIntegradosTraycommerce(
      .split(',')
      .map(s => `'${s.trim()}'`)
      .join(',')})
-  WHERE t.date >= CONCAT(?, ' 00:00:00')
-    AND t.date < DATE_ADD(CONCAT(?, ' 00:00:00'), INTERVAL 1 DAY)
+  WHERE t.date >= ?
+    AND t.date < ?
   ORDER BY t.date ASC
 `
 
-  const [rows] = await poolMonitoramento.query(sql, [janela.from, janela.to])
+  const [rows] = await poolMonitoramento.query(sql, [
+    paraInicioDiaSql(janela.from),
+    paraFimExclusivoSql(janela.to)
+  ])
 
   // O mysql2 devolve DECIMAL como string: "42.90". O tipo declara number,
   // então a linha chega com o tipo mentindo e precisa entrar como unknown

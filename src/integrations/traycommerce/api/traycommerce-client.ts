@@ -19,6 +19,18 @@ const LIMITE_POR_PAGINA = 50
 // 408 e 5xx sao transitórios, igual ao retry do nerus-sync-hub
 const STATUS_RETRYABLES = new Set([408, 429, 500, 502, 503, 504])
 
+// Falha de rede nao tem status HTTP: o `erro.response` fica undefined e o
+// erro.code traz o motivo. Sem esta lista o timeout reprova na hora, porque
+// nao casa com nenhum status - e uma pagina que deu timeout pode ter
+// respondido logo em seguida.
+const CODIGOS_RETRYABLES = new Set([
+  'ECONNABORTED', // timeout do axios
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'EAI_AGAIN' // DNS instável
+])
+
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -85,8 +97,11 @@ async function buscarPaginaComRetry(
       return response.data
     } catch (erro: any) {
       const status = erro.response?.status
+      const codigo = erro.code
+      const transitorio =
+        STATUS_RETRYABLES.has(status) || CODIGOS_RETRYABLES.has(codigo)
 
-      if (!STATUS_RETRYABLES.has(status)) {
+      if (!transitorio) {
         console.error(
           `[TRAYCOMMERCE][SYNC] Erro na página ${pagina} (HTTP ${status})`,
           erro.message
@@ -96,9 +111,12 @@ async function buscarPaginaComRetry(
 
       tentativas++
 
+      const motivo =
+        status !== undefined ? `HTTP ${status}` : `código ${codigo ?? 'desconhecido'}`
+
       if (tentativas > MAX_TENTATIVAS) {
         throw new Error(
-          `Rate limit persistente na TrayCommerce (HTTP ${status}) após ${MAX_TENTATIVAS} tentativas`
+          `Falha transitória persistente na TrayCommerce (${motivo}) após ${MAX_TENTATIVAS} tentativas`
         )
       }
 
@@ -108,7 +126,7 @@ async function buscarPaginaComRetry(
         Math.floor(Math.random() * JITTER_MS)
 
       console.log(
-        `[TRAYCOMMERCE][SYNC] HTTP ${status} transitório. Tentativa ${tentativas}/${MAX_TENTATIVAS}. Aguardando ${backoff}ms`
+        `[TRAYCOMMERCE][SYNC] ${motivo} transitório. Tentativa ${tentativas}/${MAX_TENTATIVAS}. Aguardando ${backoff}ms`
       )
 
       await sleep(backoff)
@@ -156,6 +174,7 @@ export async function buscarPedidosTraycommerce(): Promise<
   let requisicoes = 0
   let inicioJanela = Date.now()
   let ignorados = 0
+  let recebidos = 0
 
   const base = traycommerceConfig.TRAYCOMMERCE_URL.replace(/\/+$/, '')
 
@@ -212,6 +231,24 @@ export async function buscarPedidosTraycommerce(): Promise<
         }
 
         pedidos.push(o)
+      }
+
+      // A decisão de parar vem depois do processamento do lote: parar antes
+      // descartaria justamente a última página, que é a que costuma fechar a
+      // janela. A resposta já diz quantos pedidos existem, então pedir a
+      // página seguinte depois que `total` saiu é requisição inútil - e se
+      // ela dá timeout, derruba o ciclo mesmo com o resto em mãos. Por isso
+      // a parada é pelo total; a página vazia fica como fallback quando a
+      // API não manda `paging.total`.
+      recebidos += lote.length
+
+      const total = dados?.paging?.total
+
+      if (typeof total === 'number' && total >= 0 && recebidos >= total) {
+        console.log(
+          `[TRAYCOMMERCE][SYNC] Janela completa (${recebidos}/${total}). Fim.`
+        )
+        break
       }
 
       pagina++
