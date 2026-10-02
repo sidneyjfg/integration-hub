@@ -13,7 +13,7 @@ const repositoryModulePath = path.resolve(
 const coreEnvModulePath = path.resolve(__dirname, '../../src/core/env.schema.ts')
 const coreDbModulePath = path.resolve(__dirname, '../../src/core/db.ts')
 
-export = async function runSincronizarPedidosNaoIntegradosTraycommerceIntegrationTest(): Promise<void> {
+export = async function runCompararPedidosTraycommerceMockTest(): Promise<void> {
   applyTraycommerceTestEnv()
   clearModules([repositoryModulePath, coreEnvModulePath, coreDbModulePath])
 
@@ -97,10 +97,20 @@ export = async function runSincronizarPedidosNaoIntegradosTraycommerceIntegratio
   assert.match(sql, /e\.storeno IN \('1','2'\)/, 'precisa filtrar pelo STORENOS')
 
   // a janela e obrigatoria: sem ela a tabela acumulada mistura dias e o
-  // alerta sai com "4 de 2"
-  assert.match(sql, /t\.date >= CONCAT\(\?, ' 00:00:00'\)/)
-  assert.match(sql, /INTERVAL 1 DAY/)
-  assert.deepEqual(consultas[0].params, ['20220510', '20220511'])
+  // alerta sai com "4 de 2". O que vai ao banco e o datetime ja formatado,
+  // porque a API fala YYYYMMDD e o MySQL fala YYYY-MM-DD: mandar o formato
+  // da API direto estoura ER_WRONG_VALUE 1525 em qualquer base real.
+  assert.match(sql, /t\.date >= \?/)
+  assert.match(sql, /t\.date < \?/)
+  assert.doesNotMatch(
+    sql,
+    /CONCAT|DATE_ADD|INTERVAL/,
+    'a conversao de data fica em JS, nao no SQL'
+  )
+  assert.deepEqual(consultas[0].params, [
+    '2022-05-10 00:00:00',
+    '2022-05-12 00:00:00'
+  ])
   assert.match(sql, /ORDER BY t\.date ASC/, 'os mais antigos primeiro')
 
   // o repositorio precisa devolver a flag para o service contar

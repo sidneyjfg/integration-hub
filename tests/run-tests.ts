@@ -59,12 +59,20 @@ const tests: TestCase[] = [
     file: path.resolve(__dirname, 'pluggto/sincronizar-pedidos-status-ignorados.integration.test.ts')
   },
   {
-    name: 'integration: traycommerce salvar-pedidos',
-    file: path.resolve(__dirname, 'traycommerce/salvar-pedidos.integration.test.ts')
+    name: 'repository: traycommerce salvar-pedidos (mock)',
+    file: path.resolve(__dirname, 'traycommerce/salvar-pedidos.mock.test.ts')
   },
   {
-    name: 'integration: traycommerce pedidos nao integrados',
-    file: path.resolve(__dirname, 'traycommerce/sincronizar-pedidos-nao-integrados.integration.test.ts')
+    name: 'repository: traycommerce comparacao (mock)',
+    file: path.resolve(__dirname, 'traycommerce/comparar-pedidos.mock.test.ts')
+  },
+  {
+    name: 'client: traycommerce paginacao e retry (mock)',
+    file: path.resolve(__dirname, 'traycommerce/buscar-pedidos.mock.test.ts')
+  },
+  {
+    name: 'repository: traycommerce comparacao (MySQL real)',
+    file: path.resolve(__dirname, 'traycommerce/comparar-pedidos.mysql.test.ts')
   }
 ]
 

@@ -14,7 +14,7 @@ const repositoryModulePath = path.resolve(
 const coreEnvModulePath = path.resolve(__dirname, '../../src/core/env.schema.ts')
 const coreDbModulePath = path.resolve(__dirname, '../../src/core/db.ts')
 
-export = async function runSalvarPedidosTraycommerceIntegrationTest(): Promise<void> {
+export = async function runSalvarPedidosTraycommerceMockTest(): Promise<void> {
   applyTraycommerceTestEnv()
   clearModules([repositoryModulePath, coreEnvModulePath, coreDbModulePath])
 
