@@ -43,6 +43,12 @@ Automações que existem **além** do insert (as exceções ao padrão):
   descarta o trabalho dos colegas.
 - `git push origin develop` publica `ghcr.io/sidneyjfg/integrations-hub-develop:latest`;
   a `master` publica `.../integrations-hub:latest` (produção).
+- **Nunca dê `git push` sem pedido explícito do usuário.** Commit pode; push não. Publicar a
+  `develop` dispara a CI, que monta a imagem e publica a tag `latest` do `ghcr.io` — que é
+  justamente a imagem que o AWS do suporte consome, dentro do cluster do cliente. Ou seja: o
+  código do cliente passa a rodar sem ninguém ter revisado o que subiu.
+- "commita"/"commit"/"beleza"/"continua" **não** são autorização de push. Só um pedido
+  explícito de push libera, e libera só aquele push. Na dúvida, pergunte.
 - Commits em português.
 
 ## Comandos
