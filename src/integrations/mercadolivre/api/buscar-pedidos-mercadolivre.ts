@@ -58,6 +58,7 @@ async function buscarPedidosDoPeriodo(
   let offset = 0
 
   while (true) {
+    let paginaConcluida = false
     for (let tentativa = 1; tentativa <= 4; tentativa++) {
       console.log('[MERCADOLIVRE][PEDIDOS][API] Consultando página', {
         sellerId: credencial.clienteId,
@@ -102,6 +103,7 @@ async function buscarPedidosDoPeriodo(
         // O endpoint de pedidos aplica rate limit por vendedor. Mesmo com
         // resposta 200, aguardar entre páginas evita bloquear a próxima.
         await espera(1200)
+        paginaConcluida = true
         break
       } catch (error: any) {
         const status = error?.response?.status
@@ -145,6 +147,8 @@ async function buscarPedidosDoPeriodo(
         throw error
       }
     }
+
+    if (paginaConcluida) continue
 
     console.error('[MERCADOLIVRE][PEDIDOS][API] 429 persistente após tentativas', {
       sellerId: credencial.clienteId,
