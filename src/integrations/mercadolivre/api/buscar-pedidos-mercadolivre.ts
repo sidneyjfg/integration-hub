@@ -9,7 +9,16 @@ import {
 
 type PedidoMercadoLivre = {
   id: string
+  date_created?: string | null
   total_amount?: number | string | null
+  order_items?: Array<{
+    item?: { id?: string | null } | null
+  }>
+}
+
+type RespostaBuscaPedidosMercadoLivre = {
+  results?: PedidoMercadoLivre[]
+  paging?: { total?: number; offset?: number; limit?: number }
 }
 
 type ResultadoBuscaPedidos = {
@@ -20,7 +29,171 @@ type ResultadoBuscaPedidos = {
   diasAlterados: string[]
 }
 
+export type ResumoValoresPedidosMercadoLivre = {
+  valorBruto: number
+  pedidosConsultados: number
+  anunciosEncontrados: string[]
+}
+
+export type ResumoDiarioValoresPedidosMercadoLivre = {
+  valoresPorDia: Record<string, number>
+  pedidosConsultados: number
+  anunciosEncontrados: string[]
+}
+
 const espera = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
+function dataMercadoLivre(data: string, hora: string): string {
+  if (!/^\d{8}$/.test(data)) throw new Error(`Data inválida para consulta do Mercado Livre: ${data}`)
+  return `${data.slice(0, 4)}-${data.slice(4, 6)}-${data.slice(6, 8)}T${hora}-04:00`
+}
+
+async function buscarPedidosDoPeriodo(
+  inicio: string,
+  fim: string,
+  credencial: MercadoLivreCredential,
+  tokens: Map<string, string>,
+): Promise<PedidoMercadoLivre[]> {
+  const pedidos: PedidoMercadoLivre[] = []
+  let offset = 0
+
+  while (true) {
+    for (let tentativa = 1; tentativa <= 4; tentativa++) {
+      try {
+        const token =
+          tokens.get(credencial.clienteId) ??
+          getCachedAccessToken(credencial.clienteId) ??
+          credencial.accessToken
+        const resposta = await axios.get<RespostaBuscaPedidosMercadoLivre>(
+          'https://api.mercadolibre.com/orders/search',
+          {
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+            params: {
+              seller: credencial.clienteId,
+              'order.date_created.from': dataMercadoLivre(inicio, '00:00:00.000'),
+              'order.date_created.to': dataMercadoLivre(fim, '00:00:00.000'),
+              limit: 50,
+              offset,
+              sort: 'date_asc',
+            },
+          },
+        )
+
+        const pagina = resposta.data.results ?? []
+        pedidos.push(...pagina)
+        const total = Number(resposta.data.paging?.total ?? 0)
+        if (pagina.length === 0 || offset + pagina.length >= total) return pedidos
+        offset += pagina.length
+        break
+      } catch (error: any) {
+        const status = error?.response?.status
+        if (status === 429) {
+          await espera(tentativa * 3000)
+          continue
+        }
+        if (status === 401 && !tokens.has(credencial.clienteId)) {
+          const novoToken = await refreshAccessToken({
+            clientId: credencial.clientId,
+            clientSecret: credencial.clientSecret,
+            refreshToken: credencial.refreshToken,
+            clienteId: credencial.clienteId,
+          })
+          tokens.set(credencial.clienteId, novoToken)
+          continue
+        }
+        throw error
+      }
+    }
+
+    throw new Error(`429 persistente ao buscar pedidos do período para ${credencial.clienteId}`)
+  }
+}
+
+function proximoDia(data: string): string {
+  const valor = new Date(Date.UTC(
+    Number(data.slice(0, 4)),
+    Number(data.slice(4, 6)) - 1,
+    Number(data.slice(6, 8)) + 1,
+  ))
+  return `${valor.getUTCFullYear()}${String(valor.getUTCMonth() + 1).padStart(2, '0')}${String(valor.getUTCDate()).padStart(2, '0')}`
+}
+
+function buscarDatas(inicio: string, fim: string): string[] {
+  const datas: string[] = []
+  for (let data = inicio; data < fim; data = proximoDia(data)) datas.push(data)
+  return datas
+}
+
+async function buscarPedidosUnicosDoPeriodo(
+  inicio: string,
+  fim: string,
+): Promise<{ pedidos: Map<string, PedidoMercadoLivre>; anuncios: Set<string> }> {
+  const credenciais = await buscarCredenciaisMercadoLivre()
+  const tokens = new Map<string, string>()
+  const pedidos = new Map<string, PedidoMercadoLivre>()
+  const anuncios = new Set<string>()
+
+  for (const credencial of credenciais) {
+    const pedidosDaConta = await buscarPedidosDoPeriodo(inicio, fim, credencial, tokens)
+    for (const pedido of pedidosDaConta) {
+      pedidos.set(String(pedido.id), pedido)
+      for (const orderItem of pedido.order_items ?? []) {
+        if (orderItem.item?.id) anuncios.add(orderItem.item.id)
+      }
+    }
+  }
+
+  return { pedidos, anuncios }
+}
+
+export async function buscarResumoDiarioValoresPedidosMercadoLivre(
+  inicio: string,
+  fim: string,
+): Promise<ResumoDiarioValoresPedidosMercadoLivre> {
+  const { pedidos, anuncios } = await buscarPedidosUnicosDoPeriodo(inicio, fim)
+  const valoresPorDia: Record<string, number> = {}
+  let acumulado = 0
+
+  for (const data of buscarDatas(inicio, fim)) {
+    for (const pedido of pedidos.values()) {
+      if (String(pedido.date_created ?? '').slice(0, 10).replace(/-/g, '') === data) {
+        const valor = Number(pedido.total_amount ?? 0)
+        if (!Number.isFinite(valor) || valor < 0) {
+          throw new Error(`total_amount inválido para o pedido ${pedido.id}`)
+        }
+        acumulado += valor
+      }
+    }
+    valoresPorDia[data] = Number(acumulado.toFixed(2))
+  }
+
+  return {
+    valoresPorDia,
+    pedidosConsultados: pedidos.size,
+    anunciosEncontrados: [...anuncios].sort(),
+  }
+}
+
+export async function buscarResumoValoresPedidosMercadoLivre(
+  inicio: string,
+  fim: string,
+): Promise<ResumoValoresPedidosMercadoLivre> {
+  const { pedidos: pedidosPorId, anuncios } = await buscarPedidosUnicosDoPeriodo(inicio, fim)
+
+  const valorBruto = [...pedidosPorId.values()].reduce((total, pedido) => {
+    const valor = Number(pedido.total_amount ?? 0)
+    if (!Number.isFinite(valor) || valor < 0) {
+      throw new Error(`total_amount inválido para o pedido ${pedido.id}`)
+    }
+    return total + valor
+  }, 0)
+
+  return {
+    valorBruto: Number(valorBruto.toFixed(2)),
+    pedidosConsultados: pedidosPorId.size,
+    anunciosEncontrados: [...anuncios].sort(),
+  }
+}
 
 async function consultarPedido(
   pedido: string,

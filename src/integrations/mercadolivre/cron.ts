@@ -1,6 +1,7 @@
 import { sincronizarNotasMercadoLivre } from './services/sincronizar-notas-mercadolivre'
 import { sincronizarSFTPMercadoLivre } from './services/sincronizar-sftp-mercadolivre'
 import { sincronizarEtiquetaMercadoLivre } from './services/sincronizar-etiqueta-mercadolivre'
+import { buscarResumoDiarioValoresPedidosMercadoLivre } from './api/buscar-pedidos-mercadolivre'
 
 let notasMLRunning = false
 
@@ -34,7 +35,8 @@ export async function executarCronBuscaCS() {
     try {
       const d1 = resolverD1Atual()
       const periodo = resolverPeriodoD1(d1)
-      const resultado = await executarBuscaCS(d1, [periodo.fim])
+      const pedidos = await buscarResumoDiarioValoresPedidosMercadoLivre(periodo.inicio, periodo.fim)
+      const resultado = await executarBuscaCS(d1, [d1], pedidos.valoresPorDia)
       await notifyGoogleChat(`[BUSCA-CS] Planilha atualizada. Aba: ${resultado.aba}. Dia de apuração: ${resultado.dataApuracao}. Período: ${resultado.inicio} até ${resultado.fim}. Total de notas: ${resultado.totalNotas}. Valor bruto: ${resultado.valorBruto}.`)
     } catch (error: any) {
       await notifyGoogleChatError(`[BUSCA-CS] Erro ao atualizar o Google Sheets. Os últimos dados corretos foram preservados. Detalhe: ${error?.message ?? 'erro desconhecido'}`)

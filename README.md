@@ -287,7 +287,7 @@ ACTIVE_INTEGRATIONS=novohub
     -H "Content-Type: application/json" \
     -d '{"inicio":"20260901","fim":"20260917","serie":"12"}'
 
-curl -X POST "http://gruposeb-full.nerus.com.br:3009/mercadolivre/busca-cs/pedidos/serie" \
+   curl -X POST "http://gruposeb-full.nerus.com.br:3009/mercadolivre/busca-cs/pedidos/serie" \
     -H "Content-Type: application/json" \
     -d '{"inicio":"20260901","fim":"20260917","serie":"10"}'
 
@@ -299,3 +299,28 @@ curl -X POST "http://gruposeb-full.nerus.com.br:3009/mercadolivre/busca-cs/pedid
     -H "Content-Type: application/json" \
     -d '{"inicio":"20260901","fim":"20260917","serie":"8"}'
 
+SELECT
+    COUNT(*) AS totalNotas,
+    COALESCE(SUM(valorBruto), 0) AS valorBruto
+  FROM (
+    SELECT
+      chave,
+      MAX(
+        COALESCE(
+          valor_pedido,
+          CASE
+            WHEN operacao IN (
+              'Venda de mercadorias',
+              'Devolucao de mercadorias'
+            )
+            THEN CAST(REPLACE(valor, ',', '.') AS DECIMAL(18, 2))
+            ELSE 0
+          END
+        )
+      ) AS valorBruto
+    FROM sqlmonitoramento.tmp_notas
+    WHERE tipo_logistico = 'Fulfillment'
+      AND emissao >= '20260901'
+      AND emissao < '20260906'
+    GROUP BY chave
+  ) notas;

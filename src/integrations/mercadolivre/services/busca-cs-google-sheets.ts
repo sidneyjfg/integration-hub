@@ -95,7 +95,9 @@ async function localizarOuCriarAba(api: sheets_v4.Sheets, spreadsheetId: string,
   const abas = arquivo.data.sheets ?? []
   const atual = nomeAba(ano, mes, tipo)
   const existente = abas.find(a => a.properties?.title === atual)
-  if (existente?.properties?.sheetId != null) return existente.properties.sheetId
+  if (existente?.properties?.sheetId != null) {
+    return { sheetId: existente.properties.sheetId, criada: false }
+  }
 
   const criada = await api.spreadsheets.batchUpdate({
     spreadsheetId,
@@ -109,7 +111,7 @@ async function localizarOuCriarAba(api: sheets_v4.Sheets, spreadsheetId: string,
     valueInputOption: 'RAW',
     requestBody: { values: [[...CABECALHOS_PROPRIOS[tipo]]] },
   })
-  return novoId
+  return { sheetId: novoId, criada: true }
 }
 
 async function encontrarCabecalho(api: sheets_v4.Sheets, spreadsheetId: string, aba: string, tipo: 'Notas' | 'Faturamento') {
@@ -171,7 +173,11 @@ async function atualizarAba(
   if (requests.length) await api.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: { valueInputOption: 'RAW', data: requests } })
 }
 
-export async function executarBuscaCS(d1?: string, diasParaAtualizar?: string[]): Promise<BuscaCSResult> {
+export async function executarBuscaCS(
+  d1?: string,
+  diasParaAtualizar?: string[],
+  valoresBrutoOverride?: Record<string, number>,
+): Promise<BuscaCSResult> {
   const { spreadsheetId, auth } = credenciaisSheets()
   const api = google.sheets({ version: 'v4', auth })
   const hoje = agoraEmSaoPaulo()
@@ -180,9 +186,21 @@ export async function executarBuscaCS(d1?: string, diasParaAtualizar?: string[])
   const resumos = await buscarResumoDiarioBuscaCS(inicio, fim, diasNoMes)
   const abaNotas = nomeAba(ano, mes, 'Notas')
   const abaFaturamento = nomeAba(ano, mes, 'Faturamento')
-  await localizarOuCriarAba(api, spreadsheetId, ano, mes, 'Notas')
-  await localizarOuCriarAba(api, spreadsheetId, ano, mes, 'Faturamento')
-  const diasAtualizar = diasParaAtualizar ? new Set(diasParaAtualizar) : undefined
+  const notasAba = await localizarOuCriarAba(api, spreadsheetId, ano, mes, 'Notas')
+  const faturamentoAba = await localizarOuCriarAba(api, spreadsheetId, ano, mes, 'Faturamento')
+  const abaNova = notasAba.criada || faturamentoAba.criada
+  const diasAtualizar = abaNova ? undefined : (diasParaAtualizar ? new Set(diasParaAtualizar) : undefined)
+  if (valoresBrutoOverride) {
+    for (const [data, valor] of Object.entries(valoresBrutoOverride)) {
+      const indice = Number(data.slice(6, 8)) - 1
+    if (!Number.isFinite(valor) || valor < 0) {
+      throw new Error('Valor bruto do Mercado Livre inválido')
+    }
+      if (data.startsWith(`${ano}${String(mes).padStart(2, '0')}`) && resumos[indice]) {
+        resumos[indice].valorBruto = Number(valor.toFixed(2))
+      }
+    }
+  }
   await atualizarAba(api, spreadsheetId, abaNotas, 'Notas', resumos, ano, mes, diasNoMes, diaApuracao, diasAtualizar)
   await atualizarAba(api, spreadsheetId, abaFaturamento, 'Faturamento', resumos, ano, mes, diasNoMes, diaApuracao, diasAtualizar)
 
