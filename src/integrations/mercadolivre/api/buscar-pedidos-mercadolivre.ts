@@ -43,6 +43,10 @@ export type ResumoDiarioValoresPedidosMercadoLivre = {
 
 const espera = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
+function arredondarValor(valor: number): number {
+  return Number(valor.toFixed(2))
+}
+
 function dataMercadoLivre(data: string, hora: string): string {
   if (!/^\d{8}$/.test(data)) throw new Error(`Data inválida para consulta do Mercado Livre: ${data}`)
   return `${data.slice(0, 4)}-${data.slice(4, 6)}-${data.slice(6, 8)}T${hora}-04:00`
@@ -213,10 +217,11 @@ export async function buscarResumoDiarioValoresPedidosMercadoLivre(
         if (!Number.isFinite(valor) || valor < 0) {
           throw new Error(`total_amount inválido para o pedido ${pedido.id}`)
         }
-        acumulado += valor
+        acumulado += arredondarValor(valor)
       }
     }
-    valoresPorDia[data] = Number(acumulado.toFixed(2))
+    acumulado = arredondarValor(acumulado)
+    valoresPorDia[data] = acumulado
   }
 
   return {
@@ -237,11 +242,11 @@ export async function buscarResumoValoresPedidosMercadoLivre(
     if (!Number.isFinite(valor) || valor < 0) {
       throw new Error(`total_amount inválido para o pedido ${pedido.id}`)
     }
-    return total + valor
+    return total + arredondarValor(valor)
   }, 0)
 
   return {
-    valorBruto: Number(valorBruto.toFixed(2)),
+    valorBruto: arredondarValor(valorBruto),
     pedidosConsultados: pedidosPorId.size,
     anunciosEncontrados: [...anuncios].sort(),
   }
