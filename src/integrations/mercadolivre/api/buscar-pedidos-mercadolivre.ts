@@ -99,6 +99,9 @@ async function buscarPedidosDoPeriodo(
         const total = Number(resposta.data.paging?.total ?? 0)
         if (pagina.length === 0 || offset + pagina.length >= total) return pedidos
         offset += pagina.length
+        // O endpoint de pedidos aplica rate limit por vendedor. Mesmo com
+        // resposta 200, aguardar entre páginas evita bloquear a próxima.
+        await espera(1200)
         break
       } catch (error: any) {
         const status = error?.response?.status
@@ -116,9 +119,10 @@ async function buscarPedidosDoPeriodo(
           erro: error?.message ?? String(error),
         })
         if (status === 429) {
+          const esperaProgressiva = [5000, 15000, 30000, 60000][tentativa - 1]
           const esperaMs = retryAfter
-            ? Math.max(Number(retryAfter) * 1000, tentativa * 3000)
-            : tentativa * 3000
+            ? Math.max(Number(retryAfter) * 1000, esperaProgressiva)
+            : esperaProgressiva
           console.warn('[MERCADOLIVRE][PEDIDOS][API] Limite 429; aguardando antes de tentar novamente', {
             sellerId: credencial.clienteId,
             offset,
