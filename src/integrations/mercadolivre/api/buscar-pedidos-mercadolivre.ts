@@ -10,7 +10,11 @@ import {
 type PedidoMercadoLivre = {
   id: string
   date_created?: string | null
+  date_closed?: string | null
+  status?: string | null
+  cancel_detail?: { code?: string | null } | null
   total_amount?: number | string | null
+  shipping?: { id?: string | number | null } | null
   order_items?: Array<{
     item?: { id?: string | null } | null
   }>
@@ -43,13 +47,30 @@ export type ResumoDiarioValoresPedidosMercadoLivre = {
 
 const espera = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-function arredondarValor(valor: number): number {
+function arredondarCentavos(valor: number): number {
   return Number(valor.toFixed(2))
+}
+
+type RespostaShipmentMercadoLivre = {
+  logistic?: { type?: string | null } | null
+  logistic_type?: string | null
+}
+
+function arredondarValor(valor: number): number {
+  return Math.round(valor)
 }
 
 function dataMercadoLivre(data: string, hora: string): string {
   if (!/^\d{8}$/.test(data)) throw new Error(`Data inválida para consulta do Mercado Livre: ${data}`)
-  return `${data.slice(0, 4)}-${data.slice(4, 6)}-${data.slice(6, 8)}T${hora}-04:00`
+  return `${data.slice(0, 4)}-${data.slice(4, 6)}-${data.slice(6, 8)}T${hora}-03:00`
+}
+
+function dataNoHorarioDeBrasilia(data: string | null | undefined): string {
+  if (!data) return ''
+  const valor = new Date(data)
+  if (Number.isNaN(valor.getTime())) return ''
+  const brasilia = new Date(valor.getTime() - 3 * 60 * 60 * 1000)
+  return brasilia.toISOString().slice(0, 10).replace(/-/g, '')
 }
 
 async function buscarPedidosDoPeriodo(
@@ -83,8 +104,8 @@ async function buscarPedidosDoPeriodo(
             headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
             params: {
               seller: credencial.clienteId,
-              'order.date_created.from': dataMercadoLivre(inicio, '00:00:00.000'),
-              'order.date_created.to': dataMercadoLivre(fim, '00:00:00.000'),
+              'order.date_closed.from': dataMercadoLivre(inicio, '00:00:00.000'),
+              'order.date_closed.to': dataMercadoLivre(fim, '00:00:00.000'),
               limit: 50,
               offset,
               sort: 'date_asc',
@@ -191,7 +212,9 @@ async function buscarPedidosUnicosDoPeriodo(
 
   for (const credencial of credenciais) {
     const pedidosDaConta = await buscarPedidosDoPeriodo(inicio, fim, credencial, tokens)
-    for (const pedido of pedidosDaConta) {
+    const pedidosValidos = await removerPedidosPackSplitted(pedidosDaConta, credencial, tokens)
+    const pedidosFull = await filtrarPedidosFulfillment(pedidosValidos, credencial, tokens)
+    for (const pedido of pedidosFull) {
       pedidos.set(String(pedido.id), pedido)
       for (const orderItem of pedido.order_items ?? []) {
         if (orderItem.item?.id) anuncios.add(orderItem.item.id)
@@ -200,6 +223,120 @@ async function buscarPedidosUnicosDoPeriodo(
   }
 
   return { pedidos, anuncios }
+}
+
+async function filtrarPedidosFulfillment(
+  pedidos: PedidoMercadoLivre[],
+  credencial: MercadoLivreCredential,
+  tokens: Map<string, string>,
+): Promise<PedidoMercadoLivre[]> {
+  const shippingIds = [...new Set(
+    pedidos
+      .map(pedido => String(pedido.shipping?.id ?? ''))
+      .filter(Boolean),
+  )]
+  const tipos = new Map<string, string | null>()
+  let indice = 0
+
+  const trabalhador = async () => {
+    while (indice < shippingIds.length) {
+      const shippingId = shippingIds[indice++]
+      tipos.set(shippingId, await consultarTipoLogistico(shippingId, credencial, tokens))
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(8, shippingIds.length) }, trabalhador))
+
+  const pedidosFull = pedidos.filter(pedido => {
+    const shippingId = String(pedido.shipping?.id ?? '')
+    return tipos.get(shippingId) === 'fulfillment'
+  })
+
+  console.log('[MERCADOLIVRE][PEDIDOS] Filtro Full concluído', {
+    sellerId: credencial.clienteId,
+    pedidosRecebidos: pedidos.length,
+    shipmentsConsultados: shippingIds.length,
+    pedidosFull: pedidosFull.length,
+  })
+
+  return pedidosFull
+}
+
+async function consultarTipoLogistico(
+  shipment: string,
+  credencial: MercadoLivreCredential,
+  tokens: Map<string, string>,
+): Promise<string | null> {
+  for (let tentativa = 1; tentativa <= 4; tentativa++) {
+    try {
+      const token =
+        tokens.get(credencial.clienteId) ??
+        getCachedAccessToken(credencial.clienteId) ??
+        credencial.accessToken
+      const resposta = await axios.get<RespostaShipmentMercadoLivre>(
+        `https://api.mercadolibre.com/shipments/${encodeURIComponent(shipment)}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+            'x-format-new': 'true',
+          },
+        },
+      )
+      return resposta.data.logistic?.type ?? resposta.data.logistic_type ?? null
+    } catch (error: any) {
+      const status = error?.response?.status
+      if (status === 404) return null
+      if (status === 429) {
+        await espera([3000, 8000, 15000, 30000][tentativa - 1])
+        continue
+      }
+      if (status === 401 && !tokens.has(credencial.clienteId)) {
+        const novoToken = await refreshAccessToken({
+          clientId: credencial.clientId,
+          clientSecret: credencial.clientSecret,
+          refreshToken: credencial.refreshToken,
+          clienteId: credencial.clienteId,
+        })
+        tokens.set(credencial.clienteId, novoToken)
+        continue
+      }
+      throw error
+    }
+  }
+
+  throw new Error(`429 persistente ao consultar o shipment ${shipment}`)
+}
+
+async function removerPedidosPackSplitted(
+  pedidos: PedidoMercadoLivre[],
+  credencial: MercadoLivreCredential,
+  tokens: Map<string, string>,
+): Promise<PedidoMercadoLivre[]> {
+  const cancelados = pedidos.filter(pedido => pedido.status === 'cancelled')
+  if (cancelados.length === 0) return pedidos
+
+  const excluidos = new Set<string>()
+  let indice = 0
+  const trabalhador = async () => {
+    while (indice < cancelados.length) {
+      const pedido = cancelados[indice++]
+      const detalhes = await consultarPedido(pedido.id, credencial, tokens)
+      if (detalhes?.cancel_detail?.code === 'pack_splitted') excluidos.add(String(pedido.id))
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(5, cancelados.length) }, trabalhador))
+
+  if (excluidos.size > 0) {
+    console.log('[MERCADOLIVRE][PEDIDOS] Pedidos pack_splitted excluídos da venda bruta', {
+      sellerId: credencial.clienteId,
+      quantidade: excluidos.size,
+      pedidos: [...excluidos],
+    })
+  }
+
+  return pedidos.filter(pedido => !excluidos.has(String(pedido.id)))
 }
 
 export async function buscarResumoDiarioValoresPedidosMercadoLivre(
@@ -212,12 +349,13 @@ export async function buscarResumoDiarioValoresPedidosMercadoLivre(
 
   for (const data of buscarDatas(inicio, fim)) {
     for (const pedido of pedidos.values()) {
-      if (String(pedido.date_created ?? '').slice(0, 10).replace(/-/g, '') === data) {
+      const dataFechamento = dataNoHorarioDeBrasilia(pedido.date_closed)
+      if (dataFechamento === data) {
         const valor = Number(pedido.total_amount ?? 0)
         if (!Number.isFinite(valor) || valor < 0) {
           throw new Error(`total_amount inválido para o pedido ${pedido.id}`)
         }
-        acumulado += arredondarValor(valor)
+        acumulado += arredondarCentavos(valor)
       }
     }
     acumulado = arredondarValor(acumulado)
@@ -242,7 +380,7 @@ export async function buscarResumoValoresPedidosMercadoLivre(
     if (!Number.isFinite(valor) || valor < 0) {
       throw new Error(`total_amount inválido para o pedido ${pedido.id}`)
     }
-    return total + arredondarValor(valor)
+    return total + arredondarCentavos(valor)
   }, 0)
 
   return {

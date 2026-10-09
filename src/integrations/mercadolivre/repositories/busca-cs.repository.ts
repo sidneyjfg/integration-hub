@@ -52,7 +52,7 @@ export async function buscarResumoBuscaCS(
           END
         ) AS valorBruto
       FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
-      WHERE tipo_logistico = ?
+      WHERE COALESCE(status, '') = 'Autorizada'
         AND emissao >= ?
         AND emissao < ?
         ${filtroSerie}
@@ -62,7 +62,6 @@ export async function buscarResumoBuscaCS(
 
   const params: Array<string> = [
     ...OPERACOES_VALOR_BRUTO,
-    'Fulfillment',
     start,
     endExclusive,
   ]
@@ -101,7 +100,7 @@ export async function buscarResumoDiarioBuscaCS(
           END
         ) AS valor
       FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
-      WHERE tipo_logistico = ?
+      WHERE COALESCE(status, '') = 'Autorizada'
         AND emissao >= ?
         AND emissao < ?
         ${filtroSerie}
@@ -112,7 +111,6 @@ export async function buscarResumoDiarioBuscaCS(
 
   const params: Array<string | number> = [
     ...OPERACOES_VALOR_BRUTO,
-    'Fulfillment',
     start,
     endExclusive,
   ]
