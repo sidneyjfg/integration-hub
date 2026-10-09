@@ -156,7 +156,11 @@ async function atualizarAba(
   }
 
   const requests: sheets_v4.Schema$ValueRange[] = []
+  // diaApuracao representa o dia seguinte ao D-1. A linha do dia seguinte
+  // não deve ser preenchida com o mesmo acumulado do D-1.
+  const ultimoDiaPeriodo = diaApuracao === 1 ? diasNoMes : diaApuracao - 1
   for (let dia = 1; dia <= diasNoMes; dia++) {
+    if (dia > ultimoDiaPeriodo) continue
     const chave = `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`
     const indiceLinha = datas.get(chave) ?? cabecalho.linha + dia
     const deveAtualizar = !diasAtualizar || diasAtualizar.has(
@@ -165,7 +169,7 @@ async function atualizarAba(
     if (!diasAtualizar || deveAtualizar) {
       requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.dataColuna)}${indiceLinha + 1}`), values: [[chave]] })
     }
-    if (dia <= diaApuracao && deveAtualizar) {
+    if (deveAtualizar) {
       const valor = tipo === 'Notas' ? resumos[dia - 1].totalNotas : resumos[dia - 1].valorBruto
       requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.totalColuna)}${indiceLinha + 1}`), values: [[valor]] })
     }
@@ -204,10 +208,11 @@ export async function executarBuscaCS(
   await atualizarAba(api, spreadsheetId, abaNotas, 'Notas', resumos, ano, mes, diasNoMes, diaApuracao, diasAtualizar)
   await atualizarAba(api, spreadsheetId, abaFaturamento, 'Faturamento', resumos, ano, mes, diasNoMes, diaApuracao, diasAtualizar)
 
-  const atual = resumos[diaApuracao - 1]
+  const ultimoDiaPeriodo = diaApuracao === 1 ? diasNoMes : diaApuracao - 1
+  const atual = resumos[ultimoDiaPeriodo - 1]
   const resultado = {
     aba: `${abaNotas} / ${abaFaturamento}`,
-    dataApuracao: `${String(diaApuracao).padStart(2, '0')}/${String(mes).padStart(2, '0')}`,
+    dataApuracao: `${String(ultimoDiaPeriodo).padStart(2, '0')}/${String(mes).padStart(2, '0')}`,
     inicio,
     fim: dataAnterior(hoje.ano, hoje.mes, hoje.dia),
     totalNotas: atual.totalNotas,
