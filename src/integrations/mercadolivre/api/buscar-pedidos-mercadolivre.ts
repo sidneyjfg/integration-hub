@@ -59,6 +59,14 @@ async function buscarPedidosDoPeriodo(
 
   while (true) {
     for (let tentativa = 1; tentativa <= 4; tentativa++) {
+      console.log('[MERCADOLIVRE][PEDIDOS][API] Consultando página', {
+        sellerId: credencial.clienteId,
+        inicio,
+        fim,
+        offset,
+        limit: 50,
+        tentativa,
+      })
       try {
         const token =
           tokens.get(credencial.clienteId) ??
@@ -80,6 +88,13 @@ async function buscarPedidosDoPeriodo(
         )
 
         const pagina = resposta.data.results ?? []
+        console.log('[MERCADOLIVRE][PEDIDOS][API] Página recebida', {
+          sellerId: credencial.clienteId,
+          offset,
+          registros: pagina.length,
+          total: resposta.data.paging?.total ?? null,
+          status: resposta.status,
+        })
         pedidos.push(...pagina)
         const total = Number(resposta.data.paging?.total ?? 0)
         if (pagina.length === 0 || offset + pagina.length >= total) return pedidos
@@ -87,8 +102,30 @@ async function buscarPedidosDoPeriodo(
         break
       } catch (error: any) {
         const status = error?.response?.status
+        const retryAfter = error?.response?.headers?.['retry-after'] ?? null
+        console.error('[MERCADOLIVRE][PEDIDOS][API] Falha na consulta', {
+          sellerId: credencial.clienteId,
+          inicio,
+          fim,
+          offset,
+          limit: 50,
+          tentativa,
+          status: status ?? null,
+          retryAfter,
+          resposta: error?.response?.data ?? null,
+          erro: error?.message ?? String(error),
+        })
         if (status === 429) {
-          await espera(tentativa * 3000)
+          const esperaMs = retryAfter
+            ? Math.max(Number(retryAfter) * 1000, tentativa * 3000)
+            : tentativa * 3000
+          console.warn('[MERCADOLIVRE][PEDIDOS][API] Limite 429; aguardando antes de tentar novamente', {
+            sellerId: credencial.clienteId,
+            offset,
+            tentativa,
+            esperaMs,
+          })
+          await espera(esperaMs)
           continue
         }
         if (status === 401 && !tokens.has(credencial.clienteId)) {
@@ -105,6 +142,13 @@ async function buscarPedidosDoPeriodo(
       }
     }
 
+    console.error('[MERCADOLIVRE][PEDIDOS][API] 429 persistente após tentativas', {
+      sellerId: credencial.clienteId,
+      inicio,
+      fim,
+      offset,
+      tentativas: 4,
+    })
     throw new Error(`429 persistente ao buscar pedidos do período para ${credencial.clienteId}`)
   }
 }
