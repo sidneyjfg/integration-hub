@@ -1,7 +1,10 @@
 import axios from 'axios'
 import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import { pipeline } from 'stream/promises'
 import { parseStringPromise } from 'xml2js'
+import StreamZip from 'node-stream-zip'
 
 import { mercadolivreConfig } from '../env.schema'
 import {
@@ -9,11 +12,12 @@ import {
   deleteFiles,
   extractAllFiles,
   extractOrderDataFromXML,
+  getAllXmlFiles,
   getNotasWorkspace
 } from '../utils'
 
 import { MercadoLivreNotaBody } from '../../../shared/types'
-import { cacheAccessToken, refreshAccessToken } from './auth'
+import { cacheAccessToken, getCachedAccessToken, refreshAccessToken } from './auth'
 
 type BuscarNotasParams = {
   clienteId: string
@@ -31,8 +35,155 @@ type BuscarNotasResult = {
   endDate: string
 }
 
+export type ContagemNotasMercadoLivreParams = {
+  clienteId: string
+  clientId: string
+  clientSecret: string
+  accessToken: string
+  refreshToken: string
+  startDate: string
+  endDate: string
+}
+
+export type ContagemNotasMercadoLivreResult = {
+  clienteId: string
+  totalXml: number
+  totalArquivos: number
+  notasPorDia: Record<string, number>
+}
+
+export type ContaNotasMercadoLivre = {
+  clienteId: string
+  clientId: string
+  clientSecret: string
+  accessToken: string
+  refreshToken: string
+}
+
+export async function contarNotasMercadoLivreEmParalelo(
+  contas: ContaNotasMercadoLivre[],
+  periodo: { startDate: string; endDate: string },
+): Promise<ContagemNotasMercadoLivreResult[]> {
+  return Promise.all(
+    contas.map(conta => contarNotasMercadoLivre({ ...conta, ...periodo })),
+  )
+}
+
 const delay = (ms: number) =>
   new Promise(resolve => setTimeout(resolve, ms))
+
+const URL_NOTAS_BATCH = 'https://api.mercadolibre.com/users'
+
+function montarUrlNotasBatch(
+  clienteId: string,
+  startDate: string,
+  endDate: string,
+): string {
+  const params = new URLSearchParams({
+    start: startDate,
+    end: endDate,
+    sale: 'authorized',
+    return: 'authorized',
+    full: 'all',
+    others: 'all',
+    file_types: 'xml',
+    simple_folder: 'false',
+  })
+
+  return `${URL_NOTAS_BATCH}/${encodeURIComponent(clienteId)}/invoices/sites/MLB/batch_request/period/stream?${params.toString()}`
+}
+
+function extrairDataNotaAutorizadaFulfillment(xml: any): string | null {
+  const prot = xml?.nfeProc?.protNFe?.[0]?.infProt?.[0]
+  const infNFe = xml?.nfeProc?.NFe?.[0]?.infNFe?.[0]
+  if (!prot || !infNFe || prot.cStat?.[0] !== '100') return null
+
+  const natOp = String(infNFe.ide?.[0]?.natOp?.[0] ?? '')
+  const natNorm = natOp.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  if (natNorm.includes('Venda de mercadoria para consumidor final')) return null
+
+  const emissao = String(infNFe.ide?.[0]?.dhEmi?.[0] ?? '').slice(0, 10).replace(/-/g, '')
+  return /^\d{8}$/.test(emissao) ? emissao : null
+}
+
+export async function contarNotasMercadoLivre(
+  params: ContagemNotasMercadoLivreParams,
+): Promise<ContagemNotasMercadoLivreResult> {
+  const url = montarUrlNotasBatch(
+    params.clienteId,
+    params.startDate,
+    params.endDate,
+  )
+  const pastaTemporaria = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), 'mercadolivre-contagem-'),
+  )
+  const zipPath = path.join(pastaTemporaria, 'notas.zip')
+  const pastaXml = path.join(pastaTemporaria, 'xml')
+
+  try {
+    let accessToken = getCachedAccessToken(params.clienteId) ?? params.accessToken
+    let response
+
+    for (let tentativa = 1; tentativa <= 2; tentativa++) {
+      try {
+        response = await axios.get<ArrayBuffer>(url, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          responseType: 'arraybuffer',
+          maxContentLength: 200 * 1024 * 1024,
+          maxBodyLength: 200 * 1024 * 1024,
+          timeout: 120_000,
+        })
+        break
+      } catch (erro: any) {
+        if (erro?.response?.status !== 401 || tentativa === 2) throw erro
+
+        accessToken = await refreshAccessToken({
+          clientId: params.clientId,
+          clientSecret: params.clientSecret,
+          refreshToken: params.refreshToken,
+          clienteId: params.clienteId,
+        })
+      }
+    }
+
+    if (!response) throw new Error(`Não foi possível obter o ZIP da conta ${params.clienteId}`)
+
+    await fs.promises.writeFile(zipPath, Buffer.from(response.data))
+
+    const zip = new StreamZip.async({ file: zipPath })
+    try {
+      await fs.promises.mkdir(pastaXml, { recursive: true })
+      await zip.extract(null, pastaXml)
+      const arquivosXml = await getAllXmlFiles(pastaXml)
+      const notasPorDia: Record<string, number> = {}
+
+      for (const arquivoXml of arquivosXml) {
+        try {
+          const xml = await fs.promises.readFile(arquivoXml, 'utf8')
+          const emissao = extrairDataNotaAutorizadaFulfillment(await parseStringPromise(xml))
+          if (emissao) notasPorDia[emissao] = (notasPorDia[emissao] ?? 0) + 1
+        } catch (erro) {
+          console.warn('[MERCADOLIVRE][CONTAGEM] XML ignorado', {
+            clienteId: params.clienteId,
+            arquivo: arquivoXml,
+            erro: erro instanceof Error ? erro.message : String(erro),
+          })
+        }
+      }
+
+      return {
+        clienteId: params.clienteId,
+        totalXml: Object.values(notasPorDia).reduce((total, quantidade) => total + quantidade, 0),
+        totalArquivos: arquivosXml.length,
+        notasPorDia,
+      }
+    } finally {
+      await zip.close().catch(() => {})
+    }
+  } finally {
+    await fs.promises.rm(pastaTemporaria, { recursive: true, force: true }).catch(() => {})
+  }
+}
 
 const MAX_ZIP_DOWNLOAD_ATTEMPTS = 3
 

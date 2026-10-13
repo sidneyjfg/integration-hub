@@ -1,6 +1,8 @@
 import { google, sheets_v4 } from 'googleapis'
 import { coreConfig } from '../../../core/env.schema'
 import { buscarResumoDiarioBuscaCS } from '../repositories/busca-cs.repository'
+import { buscarCredenciaisMercadoLivre } from '../repositories/mercadolivre-notas.repository'
+import { contarNotasMercadoLivreEmParalelo } from '../api/buscar-notas-mercadolivre'
 
 const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
 const HEADER_NOTAS = 'dia de apuração'
@@ -163,9 +165,10 @@ async function atualizarAba(
     if (dia > ultimoDiaPeriodo) continue
     const chave = `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`
     const indiceLinha = datas.get(chave) ?? cabecalho.linha + dia
-    const deveAtualizar = !diasAtualizar || diasAtualizar.has(
-      `${String(ano).padStart(4, '0')}${String(mes).padStart(2, '0')}${String(dia).padStart(2, '0')}`,
-    )
+    const data = `${String(ano).padStart(4, '0')}${String(mes).padStart(2, '0')}${String(dia).padStart(2, '0')}`
+    const totalAtual = linhas[indiceLinha]?.[cabecalho.totalColuna]
+    const totalPendente = totalAtual == null || String(totalAtual).trim() === ''
+    const deveAtualizar = !diasAtualizar || diasAtualizar.has(data) || totalPendente
     if (!diasAtualizar || deveAtualizar) {
       requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.dataColuna)}${indiceLinha + 1}`), values: [[chave]] })
     }
@@ -188,6 +191,45 @@ export async function executarBuscaCS(
   const referencia = resolverPeriodoD1(d1 ?? resolverD1Atual())
   const { ano, mes, diaApuracao, inicio, fim, diasNoMes } = referencia
   const resumos = await buscarResumoDiarioBuscaCS(inicio, fim, diasNoMes)
+  const contas = await buscarCredenciaisMercadoLivre()
+  if (!contas.length) throw new Error('Nenhuma conta Mercado Livre encontrada para a contagem da Busca CS')
+
+  const contagens = await contarNotasMercadoLivreEmParalelo(
+    contas.map(conta => ({
+      clienteId: conta.clienteId,
+      clientId: conta.clientId,
+      clientSecret: conta.clientSecret,
+      accessToken: conta.accessToken,
+      refreshToken: conta.refreshToken,
+    })),
+    { startDate: inicio, endDate: fim },
+  )
+  const notasApiPorDia: Record<string, number> = {}
+  for (const contagem of contagens) {
+    for (const [data, quantidade] of Object.entries(contagem.notasPorDia)) {
+      notasApiPorDia[data] = (notasApiPorDia[data] ?? 0) + quantidade
+    }
+  }
+
+  let totalNotasApi = 0
+  for (let dia = 1; dia <= diasNoMes; dia++) {
+    const data = `${String(ano).padStart(4, '0')}${String(mes).padStart(2, '0')}${String(dia).padStart(2, '0')}`
+    totalNotasApi += notasApiPorDia[data] ?? 0
+    resumos[dia - 1].totalNotas = totalNotasApi
+  }
+
+  const ultimoDiaPeriodoApi = diaApuracao === 1 ? diasNoMes : diaApuracao - 1
+  totalNotasApi = resumos[ultimoDiaPeriodoApi - 1].totalNotas
+  console.log('[BUSCA-CS][API] Contagem oficial de XMLs finalizada', {
+    inicio,
+    fim,
+    totalNotas: totalNotasApi,
+    notasPorDia: notasApiPorDia,
+    porConta: contagens.map(contagem => ({
+      clienteId: contagem.clienteId,
+      totalXml: contagem.totalXml,
+    })),
+  })
   const abaNotas = nomeAba(ano, mes, 'Notas')
   const abaFaturamento = nomeAba(ano, mes, 'Faturamento')
   const notasAba = await localizarOuCriarAba(api, spreadsheetId, ano, mes, 'Notas')
