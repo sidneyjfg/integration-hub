@@ -174,20 +174,34 @@ async function contarNotasMercadoLivreUmaVez(
       await zip.extract(null, pastaXml)
       const arquivosXml = await getAllXmlFiles(pastaXml)
       const notasPorDia: Record<string, number> = {}
+      let ctesIgnorados = 0
 
       for (const arquivoXml of arquivosXml) {
+        // Ignorar apenas CT-e. Outros tipos de documento dentro de
+        // "Outros documentos" continuam sendo processados normalmente.
+        if (/(?:^|[\\/])CT(?:-|_|)?e(?:[\\/]|$)/i.test(arquivoXml)) {
+          ctesIgnorados++
+          continue
+        }
         try {
           const xml = await fs.promises.readFile(arquivoXml, 'utf8')
           const emissao = extrairDataNotaAutorizadaFulfillment(await parseStringPromise(xml))
           if (emissao) notasPorDia[emissao] = (notasPorDia[emissao] ?? 0) + 1
         } catch (erro) {
-            console.error('[MERCADOLIVRE][CONTAGEM] XML inválido; apuração interrompida', {
+          console.error('[MERCADOLIVRE][CONTAGEM] XML inválido; apuração interrompida', {
             clienteId: params.clienteId,
             arquivo: arquivoXml,
             erro: erro instanceof Error ? erro.message : String(erro),
           })
-            throw erro
+          throw erro
         }
+      }
+
+      if (ctesIgnorados > 0) {
+        console.log('[MERCADOLIVRE][CONTAGEM] Arquivos CT-e ignorados', {
+          clienteId: params.clienteId,
+          quantidade: ctesIgnorados,
+        })
       }
 
       return {
