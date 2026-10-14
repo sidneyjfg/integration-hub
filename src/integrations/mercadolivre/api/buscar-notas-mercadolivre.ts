@@ -109,6 +109,24 @@ function extrairDataNotaAutorizadaFulfillment(xml: any): string | null {
 export async function contarNotasMercadoLivre(
   params: ContagemNotasMercadoLivreParams,
 ): Promise<ContagemNotasMercadoLivreResult> {
+  for (let tentativa = 1; ; tentativa++) {
+    try {
+      return await contarNotasMercadoLivreUmaVez(params)
+    } catch (erro: any) {
+      const status = erro?.response?.status
+      const transitorio = status === 429 || status >= 500 || ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN'].includes(erro?.code) || isRetryableZipError(erro)
+      if (!transitorio || tentativa >= 3) throw erro
+      const retryAfter = Number(erro?.response?.headers?.['retry-after'])
+      const esperaMs = Math.max(tentativa * 5000, Number.isFinite(retryAfter) ? retryAfter * 1000 : 0)
+      console.warn('[BUSCA-CS][API] Repetindo contagem após falha transitória', { clienteId: params.clienteId, tentativa, status, esperaMs })
+      await delay(esperaMs)
+    }
+  }
+}
+
+async function contarNotasMercadoLivreUmaVez(
+  params: ContagemNotasMercadoLivreParams,
+): Promise<ContagemNotasMercadoLivreResult> {
   const url = montarUrlNotasBatch(
     params.clienteId,
     params.startDate,
@@ -163,11 +181,12 @@ export async function contarNotasMercadoLivre(
           const emissao = extrairDataNotaAutorizadaFulfillment(await parseStringPromise(xml))
           if (emissao) notasPorDia[emissao] = (notasPorDia[emissao] ?? 0) + 1
         } catch (erro) {
-          console.warn('[MERCADOLIVRE][CONTAGEM] XML ignorado', {
+            console.error('[MERCADOLIVRE][CONTAGEM] XML inválido; apuração interrompida', {
             clienteId: params.clienteId,
             arquivo: arquivoXml,
             erro: erro instanceof Error ? erro.message : String(erro),
           })
+            throw erro
         }
       }
 

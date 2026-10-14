@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { buscarResumoBuscaCS } from '../repositories/busca-cs.repository'
 import { executarBuscaCS, resolverPeriodoD1 } from '../services/busca-cs-google-sheets'
 import { coreConfig } from '../../../core/env.schema'
-import { buscarResumoDiarioValoresPedidosMercadoLivre } from '../api/buscar-pedidos-mercadolivre'
+import { apurarBuscaCSDiaria } from '../services/busca-cs-diaria'
 
 function d1DaQuery(req: any): string {
   const d1 = String(req.query?.d1 ?? '')
@@ -62,7 +62,8 @@ export default async function buscaCsRoutes(app: FastifyInstance) {
       if (!coreConfig.ATIVA_BUSCA_CS) return reply.code(409).send({ erro: 'ATIVA_BUSCA_CS está desativada' })
       const d1 = String((req.body as any)?.d1 ?? '')
       resolverPeriodoD1(d1)
-      const resultado = await executarBuscaCS(d1)
+      const apuracao = await apurarBuscaCSDiaria(d1, true)
+      const resultado = await executarBuscaCS(d1, undefined, apuracao.valoresPorDia, apuracao.notasPorDia)
       return { modo: 'publicacao', ...resultado }
     } catch (error: any) {
       return reply.code(400).send({ erro: error?.message ?? 'Não foi possível publicar no Sheets' })
@@ -75,11 +76,8 @@ export default async function buscaCsRoutes(app: FastifyInstance) {
       const dataReferencia = normalizarDataForcada(body.data ?? body.dia ?? body.d1)
       const d1 = diaAnterior(dataReferencia)
       const periodo = resolverPeriodoD1(d1)
-      const pedidos = await buscarResumoDiarioValoresPedidosMercadoLivre(
-        periodo.inicio,
-        periodo.fim,
-      )
-      const planilha = await executarBuscaCS(d1, [d1], pedidos.valoresPorDia)
+      const pedidos = await apurarBuscaCSDiaria(d1, true)
+      const planilha = await executarBuscaCS(d1, undefined, pedidos.valoresPorDia, pedidos.notasPorDia)
 
       return {
         modo: 'forcar-busca-cs',

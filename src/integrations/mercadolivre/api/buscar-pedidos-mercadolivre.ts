@@ -78,7 +78,19 @@ async function buscarPedidosDoPeriodo(
   fim: string,
   credencial: MercadoLivreCredential,
   tokens: Map<string, string>,
+  intervalo?: { de: number; ate: number },
 ): Promise<PedidoMercadoLivre[]> {
+  const de = intervalo?.de ?? Date.parse(dataMercadoLivre(inicio, '00:00:00.000'))
+  const ate = intervalo?.ate ?? Date.parse(dataMercadoLivre(fim, '00:00:00.000'))
+  const dividir = async (): Promise<PedidoMercadoLivre[]> => {
+    // A API considera apenas a hora nos filtros. Não dividir abaixo de uma hora.
+    const meio = de + Math.floor((ate - de) / 7200000) * 3600000
+    if (meio <= de || meio >= ate) throw new Error(`Mais de 10000 pedidos em uma hora para ${credencial.clienteId}; apuração preservada`)
+    console.warn('[MERCADOLIVRE][PEDIDOS][API] Dividindo intervalo acima do limite', { sellerId: credencial.clienteId, de, ate })
+    const primeira = await buscarPedidosDoPeriodo(inicio, fim, credencial, tokens, { de, ate: meio })
+    const segunda = await buscarPedidosDoPeriodo(inicio, fim, credencial, tokens, { de: meio, ate })
+    return [...new Map([...primeira, ...segunda].map(pedido => [String(pedido.id), pedido])).values()]
+  }
   const pedidos: PedidoMercadoLivre[] = []
   let offset = 0
 
@@ -104,12 +116,13 @@ async function buscarPedidosDoPeriodo(
             headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
             params: {
               seller: credencial.clienteId,
-              'order.date_closed.from': dataMercadoLivre(inicio, '00:00:00.000'),
-              'order.date_closed.to': dataMercadoLivre(fim, '00:00:00.000'),
+              'order.date_closed.from': new Date(de).toISOString(),
+              'order.date_closed.to': new Date(ate).toISOString(),
               limit: 50,
               offset,
               sort: 'date_asc',
             },
+            timeout: 30000,
           },
         )
 
@@ -121,8 +134,16 @@ async function buscarPedidosDoPeriodo(
           total: resposta.data.paging?.total ?? null,
           status: resposta.status,
         })
-        pedidos.push(...pagina)
-        const total = Number(resposta.data.paging?.total ?? 0)
+        const total = Number(resposta.data.paging?.total)
+        if (!Number.isFinite(total) || total < 0 || !Array.isArray(resposta.data.results)) {
+          throw new Error('Resposta de pedidos inválida; apuração interrompida')
+        }
+        if (total > 10000 || offset + pagina.length >= 10000 && total > offset + pagina.length) return dividir()
+        if (pagina.length === 0 && offset < total) throw new Error('Página vazia antes do total de pedidos; apuração interrompida')
+        pedidos.push(...pagina.filter(pedido => {
+          const fechamento = Date.parse(pedido.date_closed ?? '')
+          return fechamento >= de && fechamento < ate
+        }))
         if (pagina.length === 0 || offset + pagina.length >= total) return pedidos
         offset += pagina.length
         // O endpoint de pedidos aplica rate limit por vendedor. Mesmo com
@@ -133,6 +154,7 @@ async function buscarPedidosDoPeriodo(
       } catch (error: any) {
         const status = error?.response?.status
         const retryAfter = error?.response?.headers?.['retry-after'] ?? null
+        if (status === 400 && error?.response?.data?.error === 'limit.maximum_exceeded') return dividir()
         console.error('[MERCADOLIVRE][PEDIDOS][API] Falha na consulta', {
           sellerId: credencial.clienteId,
           inicio,
@@ -145,12 +167,11 @@ async function buscarPedidosDoPeriodo(
           resposta: error?.response?.data ?? null,
           erro: error?.message ?? String(error),
         })
-        if (status === 429) {
+        if (status === 429 || status >= 500 || ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN'].includes(error?.code)) {
           const esperaProgressiva = [5000, 15000, 30000, 60000][tentativa - 1]
-          const esperaMs = retryAfter
-            ? Math.max(Number(retryAfter) * 1000, esperaProgressiva)
-            : esperaProgressiva
-          console.warn('[MERCADOLIVRE][PEDIDOS][API] Limite 429; aguardando antes de tentar novamente', {
+          const segundos = Number(retryAfter)
+          const esperaMs = Number.isFinite(segundos) ? Math.max(segundos * 1000, esperaProgressiva) : esperaProgressiva
+          console.warn('[MERCADOLIVRE][PEDIDOS][API] Falha transitória; aguardando antes de tentar novamente', {
             sellerId: credencial.clienteId,
             offset,
             tentativa,
@@ -175,14 +196,14 @@ async function buscarPedidosDoPeriodo(
 
     if (paginaConcluida) continue
 
-    console.error('[MERCADOLIVRE][PEDIDOS][API] 429 persistente após tentativas', {
+    console.error('[MERCADOLIVRE][PEDIDOS][API] Falha persistente após tentativas', {
       sellerId: credencial.clienteId,
       inicio,
       fim,
       offset,
       tentativas: 4,
     })
-    throw new Error(`429 persistente ao buscar pedidos do período para ${credencial.clienteId}`)
+    throw new Error(`Falha persistente ao buscar pedidos do período para ${credencial.clienteId}`)
   }
 }
 
@@ -281,13 +302,14 @@ async function consultarTipoLogistico(
             Accept: 'application/json',
             'x-format-new': 'true',
           },
+          timeout: 30000,
         },
       )
       return resposta.data.logistic?.type ?? resposta.data.logistic_type ?? null
     } catch (error: any) {
       const status = error?.response?.status
       if (status === 404) return null
-      if (status === 429) {
+      if (status === 429 || status >= 500 || ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN'].includes(error?.code)) {
         await espera([3000, 8000, 15000, 30000][tentativa - 1])
         continue
       }
@@ -305,7 +327,7 @@ async function consultarTipoLogistico(
     }
   }
 
-  throw new Error(`429 persistente ao consultar o shipment ${shipment}`)
+  throw new Error(`Falha persistente ao consultar o shipment ${shipment}`)
 }
 
 async function removerPedidosPackSplitted(
@@ -347,17 +369,17 @@ export async function buscarResumoDiarioValoresPedidosMercadoLivre(
   const valoresPorDia: Record<string, number> = {}
   let acumulado = 0
 
-  for (const data of buscarDatas(inicio, fim)) {
-    for (const pedido of pedidos.values()) {
-      const dataFechamento = dataNoHorarioDeBrasilia(pedido.date_closed)
-      if (dataFechamento === data) {
-        const valor = Number(pedido.total_amount ?? 0)
-        if (!Number.isFinite(valor) || valor < 0) {
-          throw new Error(`total_amount inválido para o pedido ${pedido.id}`)
-        }
-        acumulado += arredondarCentavos(valor)
-      }
+  const totaisDiarios: Record<string, number> = {}
+  for (const pedido of pedidos.values()) {
+    const dataFechamento = dataNoHorarioDeBrasilia(pedido.date_closed)
+    const valor = Number(pedido.total_amount ?? 0)
+    if (!Number.isFinite(valor) || valor < 0) {
+      throw new Error(`total_amount inválido para o pedido ${pedido.id}`)
     }
+    totaisDiarios[dataFechamento] = (totaisDiarios[dataFechamento] ?? 0) + arredondarCentavos(valor)
+  }
+  for (const data of buscarDatas(inicio, fim)) {
+    acumulado += totaisDiarios[data] ?? 0
     acumulado = arredondarValor(acumulado)
     valoresPorDia[data] = acumulado
   }
@@ -411,7 +433,7 @@ async function consultarPedido(
 
       if (status === 404) return null
 
-      if (status === 429) {
+      if (status === 429 || status >= 500 || ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN'].includes(error?.code)) {
         await espera(tentativa * 3000)
         continue
       }
@@ -431,7 +453,7 @@ async function consultarPedido(
     }
   }
 
-  throw new Error(`429 persistente ao consultar o pedido ${pedido}`)
+  throw new Error(`Falha persistente ao consultar o pedido ${pedido}`)
 }
 
 export async function buscarValoresPedidosMercadoLivre(

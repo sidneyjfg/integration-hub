@@ -6,6 +6,8 @@ type TestCase = {
 }
 
 const tests: TestCase[] = [
+  { name: 'busca CS: revalidação diária e falhas', file: path.resolve(__dirname, 'mercadolivre/busca-cs-diaria.test.ts') },
+  { name: 'busca CS: limite de paginação e fronteiras', file: path.resolve(__dirname, 'mercadolivre/busca-cs-paginacao.test.ts') },
   {
     name: 'unit: filtro de XMLs emitidos',
     file: path.resolve(__dirname, 'mercadolivre/extract-all-files.test.ts')

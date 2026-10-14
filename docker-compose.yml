@@ -21,7 +21,7 @@ services:
       # ⏱️ CRONS
       CRON_NOTAS_SFTP: "15 01 * * *"
       CRON_NOTAS_ML: "10 01 * * *"
-      ATIVA_BUSCA_CS: "false"
+      ATIVA_BUSCA_CS: "0 6 * * *"
       GOOGLE_SHEETS_SPREADSHEET_ID:
       GOOGLE_SHEETS_CREDENTIALS_FILE: /run/secrets/google-sheets-service-account.json
       CRON_PRODUTOS: "23 23 * * *"

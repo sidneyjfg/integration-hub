@@ -177,24 +177,24 @@ async function atualizarAba(
       requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.totalColuna)}${indiceLinha + 1}`), values: [[valor]] })
     }
   }
-  if (requests.length) await api.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: { valueInputOption: 'RAW', data: requests } })
+  return requests
 }
 
 export async function executarBuscaCS(
   d1?: string,
   diasParaAtualizar?: string[],
   valoresBrutoOverride?: Record<string, number>,
+  notasPorDiaOverride?: Record<string, number>,
 ): Promise<BuscaCSResult> {
   const { spreadsheetId, auth } = credenciaisSheets()
   const api = google.sheets({ version: 'v4', auth })
-  const hoje = agoraEmSaoPaulo()
   const referencia = resolverPeriodoD1(d1 ?? resolverD1Atual())
   const { ano, mes, diaApuracao, inicio, fim, diasNoMes } = referencia
   const resumos = await buscarResumoDiarioBuscaCS(inicio, fim, diasNoMes)
-  const contas = await buscarCredenciaisMercadoLivre()
-  if (!contas.length) throw new Error('Nenhuma conta Mercado Livre encontrada para a contagem da Busca CS')
+  const contas = notasPorDiaOverride ? [] : await buscarCredenciaisMercadoLivre()
+  if (!notasPorDiaOverride && !contas.length) throw new Error('Nenhuma conta Mercado Livre encontrada para a contagem da Busca CS')
 
-  const contagens = await contarNotasMercadoLivreEmParalelo(
+  const contagens = notasPorDiaOverride ? [] : await contarNotasMercadoLivreEmParalelo(
     contas.map(conta => ({
       clienteId: conta.clienteId,
       clientId: conta.clientId,
@@ -204,7 +204,7 @@ export async function executarBuscaCS(
     })),
     { startDate: inicio, endDate: fim },
   )
-  const notasApiPorDia: Record<string, number> = {}
+  const notasApiPorDia: Record<string, number> = { ...notasPorDiaOverride }
   for (const contagem of contagens) {
     for (const [data, quantidade] of Object.entries(contagem.notasPorDia)) {
       notasApiPorDia[data] = (notasApiPorDia[data] ?? 0) + quantidade
@@ -247,8 +247,12 @@ export async function executarBuscaCS(
       }
     }
   }
-  await atualizarAba(api, spreadsheetId, abaNotas, 'Notas', resumos, ano, mes, diasNoMes, diaApuracao, diasAtualizar)
-  await atualizarAba(api, spreadsheetId, abaFaturamento, 'Faturamento', resumos, ano, mes, diasNoMes, diaApuracao, diasAtualizar)
+  const atualizacoesNotas = await atualizarAba(api, spreadsheetId, abaNotas, 'Notas', resumos, ano, mes, diasNoMes, diaApuracao, diasAtualizar)
+  const atualizacoesFaturamento = await atualizarAba(api, spreadsheetId, abaFaturamento, 'Faturamento', resumos, ano, mes, diasNoMes, diaApuracao, diasAtualizar)
+  const atualizacoes = [...atualizacoesNotas, ...atualizacoesFaturamento]
+  if (atualizacoes.length) {
+    await api.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: { valueInputOption: 'RAW', data: atualizacoes } })
+  }
 
   const ultimoDiaPeriodo = diaApuracao === 1 ? diasNoMes : diaApuracao - 1
   const atual = resumos[ultimoDiaPeriodo - 1]
@@ -256,7 +260,7 @@ export async function executarBuscaCS(
     aba: `${abaNotas} / ${abaFaturamento}`,
     dataApuracao: `${String(ultimoDiaPeriodo).padStart(2, '0')}/${String(mes).padStart(2, '0')}`,
     inicio,
-    fim: dataAnterior(hoje.ano, hoje.mes, hoje.dia),
+    fim: referencia.d1,
     totalNotas: atual.totalNotas,
     valorBruto: atual.valorBruto,
   }

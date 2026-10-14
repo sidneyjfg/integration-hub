@@ -43,7 +43,8 @@ export function registerCrons(coreConfig: CoreEnv) {
     }
 
     cron.schedule(coreConfig.ATIVA_BUSCA_CS, () =>
-      enfileirarCron('busca CS', runBuscaCSCron)
+      enfileirarCron('busca CS', runBuscaCSCron),
+      { timezone: 'America/Sao_Paulo' }
     )
   }
 }
