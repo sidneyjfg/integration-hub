@@ -40,6 +40,7 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | `MERCADOLIVRE_END_TO_FETCH` | Dia final da busca normal. | Use `0` para fechar em hoje. |
 | `MERCADOLIVRE_END_SFTP` | Dia final da busca SFTP. | Use `0` para fechar em hoje. |
 | `MERCADOLIVRE_MAX_RETRY_COUNT` | Limite de retry para notas nao integradas. | Informe um numero, ex: `5000`. |
+| `DISPONIBILIZA_XML` | Mantem uma copia acumulativa dos XMLs baixados pelo monitoramento normal. | Use `true` ou `false`. Os arquivos ficam no volume Docker `mercadolivre_xmls`, em `/app/notas/disponibilizados/<clienteId>`, e nao sao apagados automaticamente. |
 | `MERCADOLIVRE_SFTP_ENABLED` | Define se o envio usa SFTP. | Use `true` ou `false`. |
 | `MERCADOLIVRE_SFTP_DIR` | Diretorio raiz remoto do envio. | Ex: `/ML_FULL`. |
 | `MERCADOLIVRE_USE_LEDGER` | Ativa controle de enviados. | Use `true` ou `false`. |

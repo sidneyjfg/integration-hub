@@ -69,6 +69,7 @@ services:
       MERCADOLIVRE_MAX_RETRY_COUNT: 5000
 
       MERCADOLIVRE_DISPONIBILIZA_XML_DIVERGENTE:
+      DISPONIBILIZA_XML: "false"
       # Inclui XMLs de emitidas_outros_erp/xml na importacao (padrao: false)
       MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP: "false"
 
@@ -113,6 +114,11 @@ services:
         target: google-sheets-service-account.json
     ports:
       - "3000:3000"
+    volumes:
+      - mercadolivre_xmls:/app/notas/disponibilizados
+
+volumes:
+  mercadolivre_xmls:
 
 secrets:
   google_sheets_service_account:

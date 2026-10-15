@@ -13,8 +13,9 @@ import {
   extractAllFiles,
   extractOrderDataFromXML,
   getAllXmlFiles,
-  getNotasWorkspace
+  getNotasWorkspace,
 } from '../utils'
+import { disponibilizarXmls } from '../utils/disponibilizarXmls'
 
 import { MercadoLivreNotaBody } from '../../../shared/types'
 import { cacheAccessToken, getCachedAccessToken, refreshAccessToken } from './auth'
@@ -367,6 +368,19 @@ export async function buscarNotasMercadoLivre(
       clienteId,
       MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP
     )
+
+    if (!sftpMode && mercadolivreConfig.DISPONIBILIZA_XML) {
+      const resultadoDisponibilizacao = await disponibilizarXmls(
+        extractedFiles,
+        xmlDir,
+        clienteId,
+      )
+      console.log('[MERCADOLIVRE][XML] Arquivos disponibilizados', {
+        clienteId,
+        copiados: resultadoDisponibilizacao.copiados,
+        existentes: resultadoDisponibilizacao.existentes,
+      })
+    }
 
     console.log('[MERCADOLIVRE][ZIP] Extração concluída', {
       clienteId,
