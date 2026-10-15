@@ -372,7 +372,7 @@ export async function buscarNotasMercadoLivre(
     if (!sftpMode && mercadolivreConfig.DISPONIBILIZA_XML) {
       const resultadoDisponibilizacao = await disponibilizarXmls(
         extractedFiles,
-        xmlDir,
+        outputDir,
         clienteId,
       )
       console.log('[MERCADOLIVRE][XML] Arquivos disponibilizados', {
