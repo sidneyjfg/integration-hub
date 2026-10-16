@@ -107,6 +107,8 @@ services:
       # Status (ids) monitorados, separados por virgula
       TRAYCOMMERCE_ORDER_STATUS_TO_GET: ""
 
+      NERUS_NOTIFICATION_URL: ""
+
       PORT: 3000
       TZ: America/Sao_Paulo
     secrets:

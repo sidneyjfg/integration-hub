@@ -7,6 +7,7 @@ export const traycommerceEnvSchema = z.object({
     TRAYCOMMERCE_CODE: z.string(),
     TRAYCOMMERCE_STORE_ID: z.string(),
     TRAYCOMMERCE_ORDER_STATUS_TO_GET: z.string(),
+    NERUS_NOTIFICATION_URL: z.string().url().optional().or(z.literal("")),
 });
 
 export type TraycommerceEnv = z.infer<typeof traycommerceEnvSchema>

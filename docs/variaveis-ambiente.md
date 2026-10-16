@@ -96,3 +96,4 @@ Hub novo, separado do `TRAYCORP` (que continua atendendo a Wake).
 | `TRAYCOMMERCE_CODE` | Codigo da loja para autenticacao. | Informe o codigo da loja. |
 | `TRAYCOMMERCE_STORE_ID` | Id da loja. | Informe o store id. Não é enviado ao `/orders`: o token do `/auth` já vem escopado na loja (`APP_ID-xxx-STORE_ID-xxx-...`) e o endpoint não aceita o parametro. |
 | `TRAYCOMMERCE_ORDER_STATUS_TO_GET` | Status (ids) monitorados na busca de pedidos. | Separe por virgula, ex: `1,350,317`. |
+| `NERUS_NOTIFICATION_URL` | Endpoint do Nérus para reenvio (auto-cura) de pedidos não integrados. | URL completa do `receive-notification`, ex: `http://mueller.nerus.com.br:3010/api/v1/order/receive-notification`. Deixe vazio para desativar o reenvio. |
