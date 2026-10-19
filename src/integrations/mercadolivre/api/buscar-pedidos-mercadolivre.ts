@@ -41,6 +41,7 @@ export type ResumoValoresPedidosMercadoLivre = {
 
 export type ResumoDiarioValoresPedidosMercadoLivre = {
   valoresPorDia: Record<string, number>
+  totaisPorDia: Record<string, number>
   pedidosConsultados: number
   anunciosEncontrados: string[]
 }
@@ -367,6 +368,7 @@ export async function buscarResumoDiarioValoresPedidosMercadoLivre(
 ): Promise<ResumoDiarioValoresPedidosMercadoLivre> {
   const { pedidos, anuncios } = await buscarPedidosUnicosDoPeriodo(inicio, fim)
   const valoresPorDia: Record<string, number> = {}
+  const totaisPorDia: Record<string, number> = {}
   let acumulado = 0
 
   const totaisDiarios: Record<string, number> = {}
@@ -379,13 +381,15 @@ export async function buscarResumoDiarioValoresPedidosMercadoLivre(
     totaisDiarios[dataFechamento] = (totaisDiarios[dataFechamento] ?? 0) + arredondarCentavos(valor)
   }
   for (const data of buscarDatas(inicio, fim)) {
-    acumulado += totaisDiarios[data] ?? 0
+    totaisPorDia[data] = arredondarValor(totaisDiarios[data] ?? 0)
+    acumulado += totaisPorDia[data]
     acumulado = arredondarValor(acumulado)
     valoresPorDia[data] = acumulado
   }
 
   return {
     valoresPorDia,
+    totaisPorDia,
     pedidosConsultados: pedidos.size,
     anunciosEncontrados: [...anuncios].sort(),
   }

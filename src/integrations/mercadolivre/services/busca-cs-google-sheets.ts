@@ -234,8 +234,7 @@ export async function executarBuscaCS(
   const abaFaturamento = nomeAba(ano, mes, 'Faturamento')
   const notasAba = await localizarOuCriarAba(api, spreadsheetId, ano, mes, 'Notas')
   const faturamentoAba = await localizarOuCriarAba(api, spreadsheetId, ano, mes, 'Faturamento')
-  const abaNova = notasAba.criada || faturamentoAba.criada
-  const diasAtualizar = abaNova ? undefined : (diasParaAtualizar ? new Set(diasParaAtualizar) : undefined)
+  const diasAtualizar = diasParaAtualizar ? new Set(diasParaAtualizar) : undefined
   if (valoresBrutoOverride) {
     for (const [data, valor] of Object.entries(valoresBrutoOverride)) {
       const indice = Number(data.slice(6, 8)) - 1

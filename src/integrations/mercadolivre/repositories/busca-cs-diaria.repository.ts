@@ -17,3 +17,25 @@ export async function salvarApuracaoCS(contas: string, apuracao: ApuracaoDiariaC
     [contas, apuracao.dia, apuracao.totalNotas, apuracao.valorBruto],
   )
 }
+
+export type CheckpointBuscaCS = { retomarDia: string; blocoInicio: string; blocoFim: string }
+
+export async function buscarCheckpointBuscaCS(contas: string, mes: string): Promise<CheckpointBuscaCS | null> {
+  const [linhas] = await poolMonitoramento.query(
+    'SELECT retomar_dia AS retomarDia, bloco_inicio AS blocoInicio, bloco_fim AS blocoFim FROM busca_cs_checkpoint WHERE contas = ? AND mes = ?',
+    [contas, mes],
+  )
+  return (linhas as CheckpointBuscaCS[])[0] ?? null
+}
+
+export async function salvarCheckpointBuscaCS(contas: string, mes: string, checkpoint: CheckpointBuscaCS): Promise<void> {
+  await poolMonitoramento.query(
+    `INSERT INTO busca_cs_checkpoint (contas, mes, retomar_dia, bloco_inicio, bloco_fim) VALUES (?, ?, ?, ?, ?)
+     ON DUPLICATE KEY UPDATE retomar_dia = VALUES(retomar_dia), bloco_inicio = VALUES(bloco_inicio), bloco_fim = VALUES(bloco_fim)`,
+    [contas, mes, checkpoint.retomarDia, checkpoint.blocoInicio, checkpoint.blocoFim],
+  )
+}
+
+export async function limparCheckpointBuscaCS(contas: string, mes: string): Promise<void> {
+  await poolMonitoramento.query('DELETE FROM busca_cs_checkpoint WHERE contas = ? AND mes = ?', [contas, mes])
+}
