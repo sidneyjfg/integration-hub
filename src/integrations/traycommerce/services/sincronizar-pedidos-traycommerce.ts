@@ -11,6 +11,7 @@ import {
   notifyGoogleChat,
   notifyGoogleChatWarning
 } from '../notifications/google-chat'
+import { reenviarPedidosTraycommerce } from './reenviar-pedidos-traycommerce'
 
 export async function sincronizarPedidosTraycommerce() {
   console.log('[TRAYCOMMERCE][SYNC] Iniciando pedidos')
@@ -60,10 +61,14 @@ export async function sincronizarPedidosTraycommerce() {
     return
   }
 
-  // Reenvio ao Nérus ainda não implementado: por ora só avisa.
+  // Auto-cura: reenvia os não integrados ao hub do Nérus para reprocessar.
+  const pendentes = linhas.filter(linha => linha.nao_integrado === 1)
+  const reenvio = await reenviarPedidosTraycommerce(pendentes)
+
   await notifyGoogleChatWarning(
     `${naoIntegrados} de ${verificados} pedidos não integrados na TrayCommerce.\n` +
-      blocoContagem({ verificados, integrados, naoIntegrados })
+      blocoContagem({ verificados, integrados, naoIntegrados }) +
+      (reenvio.executado ? blocoReenvio(reenvio) : '')
   )
 }
 
@@ -92,6 +97,13 @@ function blocoContagem(contagem: {
     `📦 Pedidos verificados: ${contagem.verificados}\n` +
     `✅ Integrados no ERP: ${contagem.integrados}\n` +
     `❌ Não integrados: ${contagem.naoIntegrados}`
+  )
+}
+
+function blocoReenvio(reenvio: { reenviados: string[]; falhas: string[] }) {
+  return (
+    `\n\n🔁 Reenviados: ${reenvio.reenviados.length}` +
+    `\n❌ Falhas no reenvio: ${reenvio.falhas.length}`
   )
 }
 

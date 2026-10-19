@@ -73,6 +73,10 @@ const tests: TestCase[] = [
     file: path.resolve(__dirname, 'traycommerce/buscar-pedidos.mock.test.ts')
   },
   {
+    name: 'service: traycommerce reenvio auto-cura (mock)',
+    file: path.resolve(__dirname, 'traycommerce/reenviar-pedidos.mock.test.ts')
+  },
+  {
     name: 'repository: traycommerce comparacao (MySQL real)',
     file: path.resolve(__dirname, 'traycommerce/comparar-pedidos.mysql.test.ts')
   }

@@ -40,6 +40,7 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | `MERCADOLIVRE_END_TO_FETCH` | Dia final da busca normal. | Use `0` para fechar em hoje. |
 | `MERCADOLIVRE_END_SFTP` | Dia final da busca SFTP. | Use `0` para fechar em hoje. |
 | `MERCADOLIVRE_MAX_RETRY_COUNT` | Limite de retry para notas nao integradas. | Informe um numero, ex: `5000`. |
+| `DISPONIBILIZA_XML` | Mantem uma copia acumulativa dos XMLs baixados pelo monitoramento normal. | Use `true` ou `false`. Os arquivos ficam no volume Docker `mercadolivre_xmls`, em `/app/notas/disponibilizados/<clienteId>`, e nao sao apagados automaticamente. |
 | `MERCADOLIVRE_SFTP_ENABLED` | Define se o envio usa SFTP. | Use `true` ou `false`. |
 | `MERCADOLIVRE_SFTP_DIR` | Diretorio raiz remoto do envio. | Ex: `/ML_FULL`. |
 | `MERCADOLIVRE_USE_LEDGER` | Ativa controle de enviados. | Use `true` ou `false`. |
@@ -95,3 +96,4 @@ Hub novo, separado do `TRAYCORP` (que continua atendendo a Wake).
 | `TRAYCOMMERCE_CODE` | Codigo da loja para autenticacao. | Informe o codigo da loja. |
 | `TRAYCOMMERCE_STORE_ID` | Id da loja. | Informe o store id. Não é enviado ao `/orders`: o token do `/auth` já vem escopado na loja (`APP_ID-xxx-STORE_ID-xxx-...`) e o endpoint não aceita o parametro. |
 | `TRAYCOMMERCE_ORDER_STATUS_TO_GET` | Status (ids) monitorados na busca de pedidos. | Separe por virgula, ex: `1,350,317`. |
+| `NERUS_NOTIFICATION_URL` | Endpoint do Nérus para reenvio (auto-cura) de pedidos não integrados. | URL completa do `receive-notification`, ex: `http://mueller.nerus.com.br:3010/api/v1/order/receive-notification`. Deixe vazio para desativar o reenvio. |
