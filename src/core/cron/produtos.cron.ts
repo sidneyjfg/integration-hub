@@ -3,7 +3,7 @@ import { getActiveHubs } from '../utils'
 import { executarCronPorHub } from '../hub-executor'
 import { coreConfig } from '../env.schema'
 
-const HUBS_COM_PRODUTOS = ['anymarket', 'pluggto', 'traycorp']
+const HUBS_COM_PRODUTOS = ['anymarket', 'pluggto', 'traycorp', 'traycommerce']
 
 export async function runProdutosCron() {
   const active = getActiveHubs()
