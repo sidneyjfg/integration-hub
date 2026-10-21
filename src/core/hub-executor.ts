@@ -37,6 +37,7 @@ export async function executarCronPorHub(
     if (tipo === 'buscaCS' && hubCron.executarCronBuscaCS) {
       await hubCron.executarCronBuscaCS(coreConfig)
     }
+
   } catch (err) {
     console.error(`[CRON] Erro ao executar cron do hub ${hub}:`, err)
   }

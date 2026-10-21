@@ -15,7 +15,7 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | `DB_NAME_MONITORAMENTO` | Banco de tabelas temporarias. | Nome do schema de apoio/temporarios. |
 | `ACTIVE_INTEGRATIONS` | Quais integrações ficam ativas. | Separe por virgula, ex: `anymarket,mercadolivre`. |
 | `STORENOS` | Filtra lojas nas consultas SQL. | Separe por virgula, ex: `1,2,4`. |
-| `CRON_PEDIDOS` | Agenda o cron de pedidos. | Use uma expressao cron valida ou deixe vazio. |
+| `CRON_PEDIDOS` | Agenda o monitoramento de pedidos dos hubs ativos, incluindo Mercado Livre. | Use uma expressao cron valida ou deixe vazio. O Mercado Livre grava em `tmp_order` e `tmp_order_items`, identificados pela coluna `origem`; erros e cursor ficam em `tmp_checkpoint`, com horário do incidente em `incidente_em`. |
 | `CRON_PRODUTOS` | Agenda o cron de produtos. | Use uma expressao cron valida ou deixe vazio. |
 | `CRON_NOTAS_ML` | Agenda a sincronizacao normal do Mercado Livre. | Use uma expressao cron valida ou deixe vazio. |
 | `CRON_NOTAS_SFTP` | Agenda a sincronizacao SFTP do Mercado Livre. | Use uma expressao cron valida ou deixe vazio. |

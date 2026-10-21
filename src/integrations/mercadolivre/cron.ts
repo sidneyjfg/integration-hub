@@ -2,6 +2,7 @@ import { sincronizarNotasMercadoLivre } from './services/sincronizar-notas-merca
 import { sincronizarSFTPMercadoLivre } from './services/sincronizar-sftp-mercadolivre'
 import { sincronizarEtiquetaMercadoLivre } from './services/sincronizar-etiqueta-mercadolivre'
 import { apurarBuscaCSDiaria } from './services/busca-cs-diaria'
+import { sincronizarPedidosMercadoLivre } from './services/sincronizar-pedidos-mercadolivre'
 
 let notasMLRunning = false
 
@@ -97,4 +98,15 @@ export async function executarCronSFTP() {
 
 export async function executarCronEtiqueta() {
   await sincronizarEtiquetaMercadoLivre()
+}
+
+let pedidosMLRunning = false
+export async function executarCronPedidos() {
+  if (pedidosMLRunning) return
+  pedidosMLRunning = true
+  try {
+    await sincronizarPedidosMercadoLivre()
+  } finally {
+    pedidosMLRunning = false
+  }
 }
