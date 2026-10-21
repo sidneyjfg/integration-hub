@@ -2,6 +2,7 @@
 import type { CoreEnv } from '../../core/env.schema'
 import { notifyGoogleChatError } from './notifications/google-chat'
 import { sincronizarPedidosTraycommerce } from './services/sincronizar-pedidos-traycommerce'
+import { sincronizarProdutosTraycommerce } from './services/sincronizar-produtos-traycommerce'
 
 export async function executarCronPedidos(_coreConfig: CoreEnv) {
   try {
@@ -17,6 +18,24 @@ export async function executarCronPedidos(_coreConfig: CoreEnv) {
     await notifyGoogleChatError(
       `Falha no monitoramento de pedidos.\n` +
         `Contexto: sincronizar pedidos da TrayCommerce\n` +
+        `Erro: ${mensagem}`
+    )
+
+    throw erro
+  }
+}
+
+export async function executarCronProdutos(_coreConfig: CoreEnv) {
+  try {
+    await sincronizarProdutosTraycommerce()
+  } catch (erro) {
+    const mensagem = erro instanceof Error ? erro.message : String(erro)
+
+    console.error('[TRAYCOMMERCE][CRON] Falha ao sincronizar estoque', erro)
+
+    await notifyGoogleChatError(
+      `Falha no monitoramento de estoque.\n` +
+        `Contexto: sincronizar estoque da TrayCommerce\n` +
         `Erro: ${mensagem}`
     )
 

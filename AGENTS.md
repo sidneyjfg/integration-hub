@@ -4,6 +4,15 @@ Gateway de integrações (Node.js + TypeScript + Fastify + MySQL, sem ORM) que s
 produtos e notas fiscais de marketplaces — Anymarket, PluggTo, TrayCorp e Mercado Livre.
 Um processo, um contêiner, cron por hub.
 
+## Escopo das correções: só o que esta máquina fez
+
+- **Só investigue e corrija o que este computador produziu** — arquivos criados/editados nesta
+  sessão e commits locais. Não mexa no trabalho de outras pessoas nem em commits remotos.
+- Falha, bug ou dívida que **não** veio das nossas mudanças: apenas relate e siga. Só corrija se o
+  usuário pedir explicitamente.
+- Ex.: se `npm test` falha num teste do Mercado Livre vindo de um commit remoto, isso não é nosso —
+  não "conserte" sem pedido.
+
 ## O que este repo faz
 
 A Nérus é o ERP dos clientes. Cada cliente vende em canais externos, e o suporte precisa monitorar

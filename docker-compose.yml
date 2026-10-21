@@ -109,6 +109,10 @@ services:
 
       NERUS_NOTIFICATION_URL: ""
 
+      # WAKE
+      WAKE_URL: https://api.fbits.net
+      WAKE_TOKEN: ""
+
       PORT: 3000
       TZ: America/Sao_Paulo
     secrets:

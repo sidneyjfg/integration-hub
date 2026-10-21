@@ -61,3 +61,36 @@ export interface TraycommerceOrdersApiResponse {
     limit?: number
   }
 }
+
+export interface TraycommerceProductApi {
+  /** Vem como string na API. */
+  id: number | string
+  /** SKU usado pelo ERP para cruzar (às vezes "prodno-grade"). */
+  reference?: string | null
+  /** Nome do produto/variante. */
+  name?: string | null
+  /** Preço: não é gravado no monitoramento de estoque. */
+  price?: number | string | null
+  /** Estoque; vem como string na API. */
+  stock?: number | string | null
+}
+
+export interface TraycommerceProductsApiResponse {
+  Products?: Array<{ Product: TraycommerceProductApi }>
+  Variants?: Array<{ Variant: TraycommerceProductApi }>
+  paging?: {
+    total?: number
+    pages?: number
+    page?: number
+    limit?: number
+  }
+}
+
+/** Linha normalizada do catálogo para a tabela de estoque. */
+export interface TraycommerceStockBody {
+  id_tray: number
+  reference: string
+  name: string | null
+  stock: number | null
+  is_variant: boolean
+}
