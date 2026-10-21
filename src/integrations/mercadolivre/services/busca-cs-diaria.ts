@@ -4,6 +4,7 @@ import {
   buscarApuracoesCS,
   buscarCheckpointBuscaCS,
   limparCheckpointBuscaCS,
+  registrarIncidenteBuscaCS,
   salvarApuracaoCS,
   salvarCheckpointBuscaCS,
   type ApuracaoDiariaCS,
@@ -62,6 +63,7 @@ export async function apurarBuscaCSDiaria(
   if (cursor < inicio) cursor = inicio
   const progresso: ProgressoBuscaCS = { inicio: cursor, fim: d1, concluidos: [] }
 
+  try {
   while (cursor < fim) {
     const blocoInicio = cursor
     const limiteBloco = fimBlocoParaRetomar ?? somarDias(blocoInicio, DIAS_POR_BLOCO)
@@ -126,6 +128,14 @@ export async function apurarBuscaCSDiaria(
     await aoConcluirBloco?.(bloco)
     progresso.concluidos.push(bloco)
     cursor = blocoFim
+  }
+  } catch (error: any) {
+    try {
+      await registrarIncidenteBuscaCS(chaveContas, mes, String(error?.message ?? error))
+    } catch (erroCheckpoint) {
+      console.error('[BUSCA-CS][CHECKPOINT] Não foi possível registrar o incidente em tmp_checkpoint', erroCheckpoint)
+    }
+    throw error
   }
 
   await limparCheckpointBuscaCS(chaveContas, mes)
