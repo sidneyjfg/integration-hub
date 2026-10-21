@@ -87,6 +87,30 @@ const tests: TestCase[] = [
   {
     name: 'repository: traycommerce comparacao (MySQL real)',
     file: path.resolve(__dirname, 'traycommerce/comparar-pedidos.mysql.test.ts')
+  },
+  {
+    name: 'client: wake pedidos paginacao e retry (mock)',
+    file: path.resolve(__dirname, 'wake/buscar-pedidos.mock.test.ts')
+  },
+  {
+    name: 'repository: wake salvar-pedidos (mock)',
+    file: path.resolve(__dirname, 'wake/salvar-pedidos.mock.test.ts')
+  },
+  {
+    name: 'client: wake produtos cursor e headers (mock)',
+    file: path.resolve(__dirname, 'wake/buscar-produtos.mock.test.ts')
+  },
+  {
+    name: 'repository: wake salvar-precos (mock)',
+    file: path.resolve(__dirname, 'wake/salvar-precos.mock.test.ts')
+  },
+  {
+    name: 'service: wake sincronizar-produtos (mock)',
+    file: path.resolve(__dirname, 'wake/sincronizar-produtos.mock.test.ts')
+  },
+  {
+    name: 'repository: wake salvar-estoque (mock)',
+    file: path.resolve(__dirname, 'wake/salvar-estoque.mock.test.ts')
   }
 ]
 
