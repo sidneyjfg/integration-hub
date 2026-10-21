@@ -29,7 +29,6 @@ export const mercadolivreEnvSchema = z.object({
   // ⏱️ Período de busca
   MERCADOLIVRE_DAYS_TO_FETCH: z.coerce.number().min(1),
   MERCADOLIVRE_ORDERS_TO_FETCH: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).default(7)),
-  MERCADOLIVRE_ORDERS_MONITORING_ENABLED: z.preprocess(toBool, z.boolean()).default(false),
   ETIQUE_DAYS_TO_FETCH: z
     .preprocess(emptyToUndefined, z.coerce.number().int().min(1).default(1)),
   MERCADOLIVRE_END_TO_FETCH: z.coerce.number().min(0).default(0),

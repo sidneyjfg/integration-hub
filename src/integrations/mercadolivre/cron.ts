@@ -103,10 +103,6 @@ export async function executarCronEtiqueta() {
 
 let pedidosMLRunning = false
 export async function executarCronPedidos() {
-  if (!mercadolivreConfig.MERCADOLIVRE_ORDERS_MONITORING_ENABLED) {
-    console.log('[MERCADOLIVRE][PEDIDOS][CRON] Monitoramento desativado por configuração')
-    return
-  }
   if (pedidosMLRunning) return
   pedidosMLRunning = true
   try {

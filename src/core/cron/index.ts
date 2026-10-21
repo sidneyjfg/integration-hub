@@ -14,9 +14,6 @@ function registrarResumoAgendamentos(coreConfig: CoreEnv): void {
   const pedidosAtivos = ativos.filter(hub => HUBS_COM_PEDIDOS.includes(hub))
   const hubPedidosSelecionado = pedidosAtivos[0]
   const produtosAtivos = ativos.filter(hub => HUBS_COM_PRODUTOS.includes(hub))
-  const monitoramentoMLAtivo = ['1', 'true', 'yes', 'y'].includes(
-    String(process.env.MERCADOLIVRE_ORDERS_MONITORING_ENABLED ?? '').trim().toLowerCase(),
-  )
   const diasPedidosML = Number(process.env.MERCADOLIVRE_ORDERS_TO_FETCH || 7)
   const mostrar = (nome: string, expressao: string | undefined, hubs: string[]) => {
     console.log(`[STARTUP][CRON] ${nome}: ${expressao || 'desativado'}; hubs: ${expressao ? hubs.join(' → ') || 'nenhum hub ativo compatível' : 'nenhum'}`)
@@ -28,9 +25,7 @@ function registrarResumoAgendamentos(coreConfig: CoreEnv): void {
     console.log(`[STARTUP][CRON] Pedidos: selecionado somente ${hubPedidosSelecionado}; demais hubs ignorados neste cron (${pedidosAtivos.slice(1).join(', ')}). A ordem de ACTIVE_INTEGRATIONS define qual roda.`)
   }
   if (coreConfig.CRON_PEDIDOS && hubPedidosSelecionado === 'mercadolivre') {
-    console.log(
-      `[STARTUP][CRON] Mercado Livre: ${monitoramentoMLAtivo ? `monitoramento ativo, janela de ${diasPedidosML} dia(s)` : 'monitoramento desativado; defina MERCADOLIVRE_ORDERS_MONITORING_ENABLED=true para ativar'}`,
-    )
+    console.log(`[STARTUP][CRON] Mercado Livre: monitoramento ativo, janela de ${diasPedidosML} dia(s)`)
   } else if (coreConfig.CRON_PEDIDOS && pedidosAtivos.includes('mercadolivre') && hubPedidosSelecionado !== 'mercadolivre') {
     console.log(`[STARTUP][CRON] Mercado Livre não será usado para pedidos porque ${hubPedidosSelecionado} aparece antes. Para selecionar o Mercado Livre, coloque mercadolivre antes dele em ACTIVE_INTEGRATIONS.`)
   }
