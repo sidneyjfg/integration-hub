@@ -7,10 +7,13 @@ const HUBS_COM_PEDIDOS = ['anymarket', 'pluggto', 'traycorp', 'traycommerce', 'w
 
 export async function runPedidosCron() {
   const active = getActiveHubs()
+  const hubSelecionado = active.find(hub => HUBS_COM_PEDIDOS.includes(hub))
 
-  for (const hub of active) {
-    if (!HUBS_COM_PEDIDOS.includes(hub)) continue
-
-    await executarCronPorHub(hub, coreConfig, 'pedidos')
+  if (!hubSelecionado) {
+    console.warn('[CRON][PEDIDOS] Nenhum hub ativo oferece monitoramento de pedidos')
+    return
   }
+
+  console.log('[CRON][PEDIDOS] Hub selecionado pela ordem de ACTIVE_INTEGRATIONS', { hub: hubSelecionado })
+  await executarCronPorHub(hubSelecionado, coreConfig, 'pedidos')
 }

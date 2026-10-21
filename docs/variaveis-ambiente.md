@@ -36,6 +36,8 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | `MERCADOLIVRE_SFTP_USER` | Usuario do SFTP. | Informe o usuario de acesso. |
 | `MERCADOLIVRE_SFTP_PASSWORD` | Senha do SFTP. | Informe a senha do usuario. |
 | `MERCADOLIVRE_DAYS_TO_FETCH` | Quantos dias voltar na busca de notas. | Ex: `3` para buscar os ultimos 3 dias. |
+| `MERCADOLIVRE_ORDERS_TO_FETCH` | Quantos dias para trás o monitoramento de pedidos do Mercado Livre consulta em cada execução de `CRON_PEDIDOS`. | Número inteiro a partir de `1`; padrão `7`. Os resultados são atualizados de forma idempotente e falhas são registradas em `tmp_checkpoint`; a próxima execução repete a janela configurada. |
+| `MERCADOLIVRE_ORDERS_MONITORING_ENABLED` | Habilita o monitoramento de pedidos do Mercado Livre dentro de `CRON_PEDIDOS`. | Use `true` para ativar. O padrão é `false`, então atualizar o cliente não inicia a coleta automaticamente. |
 | `ETIQUE_DAYS_TO_FETCH` | Quantos dias considerar na atualizacao do nfcache de etiqueta. | Ex: `3` para atualizar hoje e os 2 dias anteriores. Se vazio, usa `1`. |
 | `MERCADOLIVRE_END_TO_FETCH` | Dia final da busca normal. | Use `0` para fechar em hoje. |
 | `MERCADOLIVRE_END_SFTP` | Dia final da busca SFTP. | Use `0` para fechar em hoje. |

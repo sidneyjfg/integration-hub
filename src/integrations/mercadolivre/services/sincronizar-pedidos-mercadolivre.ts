@@ -1,8 +1,8 @@
 import axios from 'axios'
 import { getCachedAccessToken, refreshAccessToken } from '../api/auth'
 import { buscarCredenciaisMercadoLivre } from '../repositories/mercadolivre-notas.repository'
+import { mercadolivreConfig } from '../env.schema'
 import {
-  buscarCheckpointPedidos,
   PedidoMonitorado,
   registrarErroPedidos,
   salvarCheckpointPedidos,
@@ -10,8 +10,7 @@ import {
 } from '../repositories/pedidos.repository'
 
 const espera = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-const sobreposicaoMs = 48 * 60 * 60 * 1000
-const primeiraCargaMs = 30 * 24 * 60 * 60 * 1000
+const diaMs = 24 * 60 * 60 * 1000
 
 type RespostaPedidos = { results?: PedidoMonitorado[]; paging?: { total?: number } }
 
@@ -57,10 +56,7 @@ async function consultarTipoLogistico(shippingId: string | null, credencial: any
 
 async function sincronizarConta(credencial: any): Promise<{ pedidos: number; cursor: string }> {
   const agora = new Date()
-  const checkpoint = await buscarCheckpointPedidos(credencial.clienteId)
-  const inicio = checkpoint
-    ? new Date(new Date(checkpoint.cursorData).getTime() - sobreposicaoMs)
-    : new Date(agora.getTime() - primeiraCargaMs)
+  const inicio = new Date(agora.getTime() - mercadolivreConfig.MERCADOLIVRE_ORDERS_TO_FETCH * diaMs)
   const tokens = new Map<string, string>()
   let offset = 0
   let total = 0
@@ -88,7 +84,7 @@ async function sincronizarConta(credencial: any): Promise<{ pedidos: number; cur
     await espera(1200)
   }
 
-  return { pedidos: total, cursor: new Date(agora.getTime() - sobreposicaoMs).toISOString() }
+  return { pedidos: total, cursor: agora.toISOString() }
 }
 
 export async function sincronizarPedidosMercadoLivre(): Promise<void> {
@@ -106,7 +102,7 @@ export async function sincronizarPedidosMercadoLivre(): Promise<void> {
     } catch (error: any) {
       falhas++
       const detalhe = String(error?.response?.data?.message ?? error?.message ?? error).slice(0, 4000)
-      await registrarErroPedidos(credencial.clienteId, detalhe)
+      await registrarErroPedidos(credencial.clienteId, detalhe, new Date(Date.now() - mercadolivreConfig.MERCADOLIVRE_ORDERS_TO_FETCH * diaMs).toISOString())
       console.error('[MERCADOLIVRE][PEDIDOS][SYNC] Falha; checkpoint preservado para retomada', {
         clienteId: credencial.clienteId,
         erro: detalhe,

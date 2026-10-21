@@ -3,6 +3,7 @@ import { sincronizarSFTPMercadoLivre } from './services/sincronizar-sftp-mercado
 import { sincronizarEtiquetaMercadoLivre } from './services/sincronizar-etiqueta-mercadolivre'
 import { apurarBuscaCSDiaria } from './services/busca-cs-diaria'
 import { sincronizarPedidosMercadoLivre } from './services/sincronizar-pedidos-mercadolivre'
+import { mercadolivreConfig } from './env.schema'
 
 let notasMLRunning = false
 
@@ -102,6 +103,10 @@ export async function executarCronEtiqueta() {
 
 let pedidosMLRunning = false
 export async function executarCronPedidos() {
+  if (!mercadolivreConfig.MERCADOLIVRE_ORDERS_MONITORING_ENABLED) {
+    console.log('[MERCADOLIVRE][PEDIDOS][CRON] Monitoramento desativado por configuração')
+    return
+  }
   if (pedidosMLRunning) return
   pedidosMLRunning = true
   try {

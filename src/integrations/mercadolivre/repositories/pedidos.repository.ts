@@ -16,18 +16,8 @@ export type PedidoMonitorado = {
   }>
 }
 
-export type CheckpointPedidos = { cursorData: string }
 const ORIGEM = 'mercadolivre'
 const PROCESSO = 'pedidos'
-
-export async function buscarCheckpointPedidos(clienteId: string): Promise<CheckpointPedidos | null> {
-  const [rows] = await poolMonitoramento.execute(
-    "SELECT DATE_FORMAT(cursor_data, '%Y-%m-%dT%H:%i:%sZ') AS cursorData FROM tmp_checkpoint WHERE origem = ? AND processo = ? AND cliente_id = ?",
-    [ORIGEM, PROCESSO, clienteId],
-  )
-  const row = (rows as any[])[0]
-  return row ? { cursorData: new Date(row.cursorData).toISOString() } : null
-}
 
 export async function salvarCheckpointPedidos(clienteId: string, cursorData: string, erro: string | null): Promise<void> {
   await poolMonitoramento.execute(
@@ -38,12 +28,12 @@ export async function salvarCheckpointPedidos(clienteId: string, cursorData: str
   )
 }
 
-export async function registrarErroPedidos(clienteId: string, erro: string): Promise<void> {
+export async function registrarErroPedidos(clienteId: string, erro: string, cursorInicial: string): Promise<void> {
   await poolMonitoramento.execute(
     `INSERT INTO tmp_checkpoint (origem, processo, cliente_id, cursor_data, ultima_execucao, incidente_em, ultimo_erro)
-     VALUES (?, ?, ?, DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 30 DAY), CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)
+     VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)
      ON DUPLICATE KEY UPDATE ultimo_erro = VALUES(ultimo_erro), incidente_em = CURRENT_TIMESTAMP, ultima_execucao = CURRENT_TIMESTAMP`,
-    [ORIGEM, PROCESSO, clienteId, erro.slice(0, 4000)],
+    [ORIGEM, PROCESSO, clienteId, cursorInicial.slice(0, 19).replace('T', ' '), erro.slice(0, 4000)],
   )
 }
 
