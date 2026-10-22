@@ -28,6 +28,7 @@ export async function salvarPrecosWake(
       produto_variante_id,
       produto_id,
       id_pai_externo,
+      id_vinculo_externo,
       sku,
       nome,
       preco_custo,
@@ -39,6 +40,7 @@ export async function salvarPrecosWake(
     ON DUPLICATE KEY UPDATE
       produto_id = VALUES(produto_id),
       id_pai_externo = VALUES(id_pai_externo),
+      id_vinculo_externo = VALUES(id_vinculo_externo),
       sku = VALUES(sku),
       nome = VALUES(nome),
       preco_custo = VALUES(preco_custo),
@@ -58,6 +60,7 @@ export async function salvarPrecosWake(
       p.produto_variante_id,
       p.produto_id,
       p.id_pai_externo,
+      p.id_vinculo_externo,
       p.sku,
       p.nome,
       p.preco_custo,
@@ -77,4 +80,27 @@ export async function salvarPrecosWake(
   })
 
   return afetadas
+}
+
+/**
+ * Remove linhas que nao foram atualizadas neste ciclo. Como so os produtos
+ * validos entram no upsert, quem virou invalido ou perdeu o ID Nérus fica
+ * com `updated_at` antigo e sai da tabela.
+ */
+export async function removerPrecosNaoAtualizadosWake(
+  desde: Date
+): Promise<number> {
+  const sql = `
+    DELETE FROM ${coreConfig.DB_NAME_MONITORAMENTO}.temp_wake_price
+    WHERE updated_at < ?
+  `
+
+  const [result] = await poolMonitoramento.query(sql, [desde])
+  const removidas = (result as any).affectedRows ?? 0
+
+  console.log('[WAKE][PRODUTOS][DB] Preços antigos removidos', {
+    removidas
+  })
+
+  return removidas
 }

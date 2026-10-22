@@ -48,7 +48,9 @@ export interface WakeProductApi {
   produtoId?: number | string | null
   /** Id do produto pai no canal externo, quando houver. */
   idPaiExterno?: string | null
-  /** SKU usado pelo ERP para cruzar a linha. */
+  /** Id da variante no canal externo; e o `prdno` do Nérus. */
+  idVinculoExterno?: string | null
+  /** SKU/EAN mantido como referencia; o cruzamento usa o `prdno`. */
   sku?: string | null
   nome?: string | null
   precoCusto?: number | string | null
@@ -65,6 +67,8 @@ export interface WakePriceBody {
   produto_variante_id: number
   produto_id: number | null
   id_pai_externo: string | null
+  /** `prdno` do Nérus, usado pelo ERP para cruzar a linha. */
+  id_vinculo_externo: string
   sku: string
   nome: string | null
   preco_custo: number | null
@@ -78,9 +82,18 @@ export interface WakePriceBody {
 /** Linha normalizada do catalogo para a tabela de estoque. */
 export interface WakeStockBody {
   produto_variante_id: number
+  id_pai_externo: string | null
+  /** `prdno` do Nérus, usado pelo ERP para cruzar a linha. */
+  id_vinculo_externo: string
   sku: string
   nome: string | null
   /** Soma dos centros de distribuicao; null quando a API nao mandou o array. */
   estoque_fisico: number | null
   estoque_reservado: number | null
+}
+
+/** Resultado da varredura do catalogo, com o indicador de paginacao completa. */
+export interface WakeBuscaProdutosResultado {
+  produtos: WakeProductApi[]
+  completa: boolean
 }

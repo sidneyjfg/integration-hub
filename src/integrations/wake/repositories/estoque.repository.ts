@@ -26,12 +26,16 @@ export async function salvarEstoqueWake(
   const sql = `
     INSERT INTO ${coreConfig.DB_NAME_MONITORAMENTO}.temp_wake_stock (
       produto_variante_id,
+      id_pai_externo,
+      id_vinculo_externo,
       sku,
       nome,
       estoque_fisico,
       estoque_reservado
     ) VALUES ?
     ON DUPLICATE KEY UPDATE
+      id_pai_externo = VALUES(id_pai_externo),
+      id_vinculo_externo = VALUES(id_vinculo_externo),
       sku = VALUES(sku),
       nome = VALUES(nome),
       estoque_fisico = VALUES(estoque_fisico),
@@ -46,6 +50,8 @@ export async function salvarEstoqueWake(
 
     const values = lote.map(p => [
       p.produto_variante_id,
+      p.id_pai_externo,
+      p.id_vinculo_externo,
       p.sku,
       p.nome,
       p.estoque_fisico,
@@ -62,4 +68,27 @@ export async function salvarEstoqueWake(
   })
 
   return afetadas
+}
+
+/**
+ * Remove linhas que nao foram atualizadas neste ciclo. Como so os produtos
+ * validos entram no upsert, quem virou invalido ou perdeu o ID Nérus fica
+ * com `updated_at` antigo e sai da tabela.
+ */
+export async function removerEstoqueNaoAtualizadosWake(
+  desde: Date
+): Promise<number> {
+  const sql = `
+    DELETE FROM ${coreConfig.DB_NAME_MONITORAMENTO}.temp_wake_stock
+    WHERE updated_at < ?
+  `
+
+  const [result] = await poolMonitoramento.query(sql, [desde])
+  const removidas = (result as any).affectedRows ?? 0
+
+  console.log('[WAKE][PRODUTOS][DB] Estoque antigo removido', {
+    removidas
+  })
+
+  return removidas
 }

@@ -4,6 +4,7 @@ import { wakeConfig } from '../env.schema'
 import { getDateRange } from '../utils'
 import {
   WakeBuscaPedidosResumo,
+  WakeBuscaProdutosResultado,
   WakeOrderApi,
   WakeOrderStatusApi,
   WakeProductApi
@@ -240,13 +241,15 @@ export async function buscarPedidosWake(): Promise<WakeOrderApi[]> {
  * `camposAdicionais=Estoque` traz o `estoque[]` na mesma varredura, para o
  * monitoramento de estoque nao precisar de uma segunda passada.
  */
-export async function buscarProdutosWake(): Promise<WakeProductApi[]> {
+export async function buscarProdutosWake(): Promise<WakeBuscaProdutosResultado> {
   console.log('[WAKE][PRODUTOS] Iniciando busca de produtos')
 
   const base = wakeConfig.WAKE_URL.replace(/\/+$/, '')
   const produtos: WakeProductApi[] = []
   let cursor: string | null = null
   let pagina = 0
+  let completa = true
+  let totalProdutos: number | undefined
 
   try {
     while (true) {
@@ -272,6 +275,11 @@ export async function buscarProdutosWake(): Promise<WakeProductApi[]> {
         prefixo: '[WAKE][PRODUTOS]'
       })
       const lote = Array.isArray(response.data) ? response.data : []
+      const totalPagina = extrairTotal(response.headers['x-total-count'])
+
+      if (typeof totalPagina === 'number') {
+        totalProdutos = totalPagina
+      }
 
       const temProximaHeader = response.headers['x-tem-proxima-pagina']
       const temProximaAusente =
@@ -301,20 +309,35 @@ export async function buscarProdutosWake(): Promise<WakeProductApi[]> {
 
       if (!proximoCursor || proximoCursor === cursor) {
         console.warn(
-          '[WAKE][PRODUTOS] Paginação sem cursor novo; encerrando busca',
+          '[WAKE][PRODUTOS] Paginação sem cursor novo; encerrando busca incompleta',
           { pagina, registros: lote.length }
         )
+        completa = false
         break
       }
 
       cursor = proximoCursor
     }
 
+    // Se a API informou o total e vieram menos registros, a paginacao parou
+    // antes do fim. A limpeza por `updated_at` nao pode rodar nesse caso.
+    if (
+      typeof totalProdutos === 'number' &&
+      produtos.length < totalProdutos
+    ) {
+      console.warn('[WAKE][PRODUTOS] Catálogo incompleto', {
+        recebidos: produtos.length,
+        total: totalProdutos
+      })
+      completa = false
+    }
+
     console.log('[WAKE][PRODUTOS] Busca finalizada', {
-      totalProdutos: produtos.length
+      totalProdutos: produtos.length,
+      completa
     })
 
-    return produtos
+    return { produtos, completa }
   } catch (erro) {
     console.error('[WAKE][PRODUTOS] Erro ao buscar produtos', erro)
     throw erro
