@@ -2,7 +2,8 @@
 -- Tabela propria por hub: nao usa `temp_products` para nao colidir com
 -- anymarket, pluggto e traycorp, que gravam o mesmo nome no mesmo schema.
 -- A API devolve o estoque por centro de distribuicao no `estoque[]`; aqui a
--- linha e por variante, com a soma dos centros, para o ERP cruzar pelo `sku`.
+-- linha e por variante, com a soma dos centros. O ERP cruza pelo
+-- `id_vinculo_externo` (`prdno`); o `sku`/EAN fica como referencia.
 CREATE TABLE IF NOT EXISTS temp_wake_stock (
   produto_variante_id BIGINT(20) NOT NULL,
   sku VARCHAR(255) NOT NULL DEFAULT '',

@@ -1,7 +1,8 @@
 -- Tabela de monitoramento de preco da Wake (Fbits).
 -- Tabela propria por hub: nao usa `temp_products` para nao colidir com
 -- anymarket, pluggto e traycorp, que gravam o mesmo nome no mesmo schema.
--- A chave e a variante; o ERP cruza pelo `sku` e filtra `valido` no SQL.
+-- A chave e a variante; o ERP cruza pelo `id_vinculo_externo` (`prdno`).
+-- O `sku`/EAN fica como referencia.
 CREATE TABLE IF NOT EXISTS temp_wake_price (
   produto_variante_id BIGINT(20) NOT NULL,
   produto_id BIGINT(20) DEFAULT NULL,
