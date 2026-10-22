@@ -25,6 +25,7 @@ export type ProdutoWakeFixture = {
   produtoVarianteId: number | string
   produtoId?: number | string | null
   idPaiExterno?: string | null
+  idVinculoExterno?: string | null
   sku?: string | null
   nome?: string | null
   precoCusto?: number | string | null

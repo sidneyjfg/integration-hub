@@ -56,6 +56,7 @@ export = async function runBuscarProdutosWakeMockTest(): Promise<void> {
   await casoSemProximaPagina()
   await casoCursorAusente()
   await casoHeaderTemProximaAusente()
+  await casoTotalMaiorQueRecebido()
   await casoErroPropaga()
 }
 
@@ -110,9 +111,12 @@ async function casoCatalogoPorCursor(): Promise<void> {
   })
   const cliente = await carregarCliente(axiosMock)
 
-  const produtos = await semEsperaReal(() => cliente.buscarProdutosWake())
+  const { produtos, completa } = await semEsperaReal(() =>
+    cliente.buscarProdutosWake()
+  )
 
   assert.equal(produtos.length, 5)
+  assert.equal(completa, true)
 
   const requisicoes = requisicoesDeProdutos(axiosMock)
 
@@ -155,9 +159,12 @@ async function casoSemProximaPagina(): Promise<void> {
   })
   const cliente = await carregarCliente(axiosMock)
 
-  const produtos = await semEsperaReal(() => cliente.buscarProdutosWake())
+  const { produtos, completa } = await semEsperaReal(() =>
+    cliente.buscarProdutosWake()
+  )
 
   assert.equal(produtos.length, 1)
+  assert.equal(completa, true)
   assert.equal(requisicoesDeProdutos(axiosMock).length, 1)
 }
 
@@ -174,9 +181,16 @@ async function casoCursorAusente(): Promise<void> {
   })
   const cliente = await carregarCliente(axiosMock)
 
-  const produtos = await semEsperaReal(() => cliente.buscarProdutosWake())
+  const { produtos, completa } = await semEsperaReal(() =>
+    cliente.buscarProdutosWake()
+  )
 
   assert.equal(produtos.length, 1)
+  assert.equal(
+    completa,
+    false,
+    'sem cursor novo, a varredura fica marcada como incompleta'
+  )
   assert.equal(
     requisicoesDeProdutos(axiosMock).length,
     1,
@@ -202,13 +216,39 @@ async function casoHeaderTemProximaAusente(): Promise<void> {
   })
   const cliente = await carregarCliente(axiosMock)
 
-  const produtos = await semEsperaReal(() => cliente.buscarProdutosWake())
+  const { produtos, completa } = await semEsperaReal(() =>
+    cliente.buscarProdutosWake()
+  )
 
   assert.equal(produtos.length, 2)
+  assert.equal(completa, true)
   assert.deepEqual(
     requisicoesDeProdutos(axiosMock).map(r => r.cursor),
     [null, '1']
   )
+}
+
+/** Total maior que o recebido indica varredura parcial, mesmo sem erro. */
+async function casoTotalMaiorQueRecebido(): Promise<void> {
+  const axiosMock = createWakeAxiosMock({
+    paginasProdutos: [
+      criarPaginaProdutosWake({
+        produtos: [{ produtoVarianteId: 1, sku: 'SKU-1' }],
+        temProximaPagina: false,
+        ultimoProdutoVarianteId: 1,
+        total: 5
+      })
+    ]
+  })
+  const cliente = await carregarCliente(axiosMock)
+
+  const { produtos, completa } = await semEsperaReal(() =>
+    cliente.buscarProdutosWake()
+  )
+
+  assert.equal(produtos.length, 1)
+  assert.equal(completa, false)
+  assert.equal(requisicoesDeProdutos(axiosMock).length, 1)
 }
 
 /** Erro real (401) nao e transitorio e precisa propagar. */

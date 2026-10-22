@@ -17,6 +17,7 @@ export = async function runSalvarEstoqueWakeMockTest(): Promise<void> {
   await casoSalvaEstoque()
   await casoListaVazia()
   await casoEnviaEmLotes()
+  await casoRemoveNaoAtualizados()
 }
 
 function carregarRepositorio(
@@ -35,6 +36,8 @@ function carregarRepositorio(
 function criarLinha(id: number) {
   return {
     produto_variante_id: id,
+    id_pai_externo: null,
+    id_vinculo_externo: `NERUS-${id}`,
     sku: `SKU-${id}`,
     nome: `Produto ${id}`,
     estoque_fisico: 10,
@@ -63,11 +66,20 @@ async function casoSalvaEstoque(): Promise<void> {
     'a tabela precisa ser a propria do hub'
   )
   assert.match(chamadas[0].sql, /ON DUPLICATE KEY UPDATE/)
+  assert.match(chamadas[0].sql, /id_vinculo_externo/)
 
   const values = chamadas[0].params[0] as unknown[][]
 
   assert.equal(values.length, 2)
-  assert.deepEqual(values[0], [101, 'SKU-101', 'Produto 101', 10, 2])
+  assert.deepEqual(values[0], [
+    101,
+    null,
+    'NERUS-101',
+    'SKU-101',
+    'Produto 101',
+    10,
+    2
+  ])
 }
 
 async function casoListaVazia(): Promise<void> {
@@ -101,4 +113,27 @@ async function casoEnviaEmLotes(): Promise<void> {
   assert.equal((chamadas[0].params[0] as unknown[][]).length, 500)
   assert.equal((chamadas[1].params[0] as unknown[][]).length, 1)
   assert.equal(afetadas, 2)
+}
+
+/** A limpeza usa o `updated_at` anterior ao inicio do ciclo. */
+async function casoRemoveNaoAtualizados(): Promise<void> {
+  const chamadas: Array<{ sql: string; params: unknown[] }> = []
+  const desde = new Date('2026-10-22T12:00:00.000Z')
+
+  const repositorio = carregarRepositorio(async (sql, params) => {
+    chamadas.push({ sql, params })
+    return [{ affectedRows: 4 }]
+  })
+
+  const removidas =
+    await repositorio.removerEstoqueNaoAtualizadosWake(desde)
+
+  assert.equal(removidas, 4)
+  assert.equal(chamadas.length, 1)
+  assert.match(
+    chamadas[0].sql,
+    /DELETE FROM monitoramento\.temp_wake_stock/
+  )
+  assert.match(chamadas[0].sql, /updated_at < \?/)
+  assert.deepEqual(chamadas[0].params, [desde])
 }
