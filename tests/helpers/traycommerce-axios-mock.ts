@@ -57,6 +57,8 @@ export function createTraycommerceAxiosMock(options?: {
   /** Erros HTTP por página: { pagina: status }. */
   httpPorPagina?: Record<number, number>
   token?: string
+  refreshToken?: string
+  falharRenovacao?: boolean
 }) {
   const paginas = options?.paginas ?? []
   const timeoutsPorPagina = options?.timeoutsPorPagina ?? {}
@@ -64,6 +66,7 @@ export function createTraycommerceAxiosMock(options?: {
 
   const requisicoes: Array<{ pagina: number; tentativa: number; url: string }> = []
   const tentativasPorPagina = new Map<number, number>()
+  let renovacoes = 0
 
   function erroAxios(mensagem: string, extra: Record<string, unknown>) {
     const erro = new Error(mensagem) as Error & Record<string, unknown>
@@ -76,7 +79,26 @@ export function createTraycommerceAxiosMock(options?: {
     requisicoes,
 
     get: async (url: string) => {
-      const params = new URL(url).searchParams
+      const parsed = new URL(url)
+
+      if (parsed.pathname.endsWith('/auth')) {
+        if (options?.falharRenovacao) {
+          throw erroAxios('Request failed with status code 401', {
+            code: 'ERR_BAD_REQUEST',
+            response: { status: 401 }
+          })
+        }
+
+        return {
+          status: 200,
+          data: {
+            access_token: `token-renovado-${++renovacoes}`,
+            refresh_token: options?.refreshToken ?? 'refresh-token-traycommerce'
+          }
+        }
+      }
+
+      const params = parsed.searchParams
       const pagina = Number(params.get('page') ?? '1')
       const tentativa = (tentativasPorPagina.get(pagina) ?? 0) + 1
       tentativasPorPagina.set(pagina, tentativa)
@@ -101,7 +123,10 @@ export function createTraycommerceAxiosMock(options?: {
 
     post: async () => ({
       status: 200,
-      data: { access_token: options?.token ?? 'token-traycommerce' }
+      data: {
+        access_token: options?.token ?? 'token-traycommerce',
+        refresh_token: options?.refreshToken ?? 'refresh-token-traycommerce'
+      }
     })
   }
 }

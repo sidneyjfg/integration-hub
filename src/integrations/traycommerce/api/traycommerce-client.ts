@@ -45,16 +45,62 @@ const STATUS_MONITORADOS = new Set(
     .filter(Boolean)
 )
 
+type TraycommerceAuthResponse = {
+  access_token?: string
+  refresh_token?: string
+}
+
+type TokenCache = {
+  accessToken: string
+  refreshToken: string | null
+}
+
+let tokenCache: TokenCache | null = null
+
+/**
+ * O erro completo do Axios traz `config.url` com o access_token na query.
+ * O log precisa ficar só com o que ajuda a diagnosticar.
+ */
+function resumirErroTray(erro: any) {
+  const dados = erro?.response?.data
+
+  return {
+    status: erro?.response?.status,
+    errorCode: dados?.error_code ?? dados?.code,
+    causes: dados?.causes,
+    message: erro?.message
+  }
+}
+
+function erroTraySanitizado(erro: any): Error {
+  const sanitizado = new Error(erro?.message ?? 'Erro na TrayCommerce') as Error & {
+    code?: string
+    response?: { status?: number; data?: any }
+  }
+
+  sanitizado.code = erro?.code
+
+  if (erro?.response) {
+    sanitizado.response = {
+      status: erro.response.status,
+      data: erro.response.data
+    }
+  }
+
+  return sanitizado
+}
+
 /**
  * 🔑 Autentica na TrayCommerce e devolve o access token.
  * A API usa POST /auth com consumer_key, consumer_secret e code.
+ * O refresh_token devolvido aqui é o que permite renovar sem pedir o code de novo.
  */
-export async function getAccessToken(): Promise<string> {
+async function autenticarComCode(): Promise<string> {
   const { TRAYCOMMERCE_URL, TRAYCOMMERCE_CONSUMER_KEY, TRAYCOMMERCE_SECRET_KEY, TRAYCOMMERCE_CODE } =
     traycommerceConfig
 
   try {
-    const response: AxiosResponse<{ access_token?: string }> = await axios.post(
+    const response: AxiosResponse<TraycommerceAuthResponse> = await axios.post(
       `${TRAYCOMMERCE_URL.replace(/\/+$/, '')}/auth`,
       {
         consumer_key: TRAYCOMMERCE_CONSUMER_KEY,
@@ -70,11 +116,75 @@ export async function getAccessToken(): Promise<string> {
       throw new Error('TrayCommerce não retornou access_token')
     }
 
+    tokenCache = {
+      accessToken: token,
+      refreshToken: response.data?.refresh_token ?? null
+    }
+
     return token
   } catch (erro: any) {
-    console.error('[TRAYCOMMERCE][AUTH] Erro ao obter token', erro.message)
-    throw erro
+    console.error('[TRAYCOMMERCE][AUTH] Erro ao obter token', resumirErroTray(erro))
+    throw erroTraySanitizado(erro)
   }
+}
+
+/**
+ * Renova o access_token com o refresh_token salvo. Se a renovação falhar,
+ * cai para o code como última tentativa de recuperar a coleta.
+ */
+async function renovarAccessToken(): Promise<string> {
+  const refreshToken = tokenCache?.refreshToken
+
+  if (!refreshToken) {
+    console.warn('[TRAYCOMMERCE][AUTH] Sem refresh_token; gerando token com code')
+    tokenCache = null
+    return autenticarComCode()
+  }
+
+  try {
+    const base = traycommerceConfig.TRAYCOMMERCE_URL.replace(/\/+$/, '')
+    const response: AxiosResponse<TraycommerceAuthResponse> = await axios.get(
+      `${base}/auth?refresh_token=${encodeURIComponent(refreshToken)}`,
+      { timeout: TIMEOUT_MS }
+    )
+
+    const token = response.data?.access_token
+
+    if (!token) {
+      throw new Error('TrayCommerce não retornou access_token na renovação')
+    }
+
+    tokenCache = {
+      accessToken: token,
+      refreshToken: response.data?.refresh_token ?? refreshToken
+    }
+
+    console.log('[TRAYCOMMERCE][AUTH] Token renovado via refresh_token')
+    return token
+  } catch (erro: any) {
+    console.warn(
+      '[TRAYCOMMERCE][AUTH] Falha ao renovar via refresh_token; tentando code',
+      resumirErroTray(erro)
+    )
+    tokenCache = null
+    return autenticarComCode()
+  }
+}
+
+/**
+ * Devolve o token em cache. Com `forceRefresh`, tenta renovar pelo
+ * refresh_token antes de cair para uma nova autenticação com code.
+ */
+export async function getAccessToken(forceRefresh = false): Promise<string> {
+  if (!forceRefresh && tokenCache?.accessToken) {
+    return tokenCache.accessToken
+  }
+
+  if (forceRefresh) {
+    return renovarAccessToken()
+  }
+
+  return autenticarComCode()
 }
 
 /**
@@ -83,18 +193,30 @@ export async function getAccessToken(): Promise<string> {
  * 5xx e 408 também são transitórios, então entram no mesmo retry.
  */
 async function buscarPaginaComRetry<T>(
-  urlFinal: string,
+  montarUrl: (token: string) => string,
   pagina: number,
   opcoes: { prefixo?: string; logarErro?: boolean } = {}
 ): Promise<T> {
   const prefixo = opcoes.prefixo ?? '[TRAYCOMMERCE][SYNC]'
   const logarErro = opcoes.logarErro ?? true
   let tentativas = 0
+  let tokenRenovado = false
 
   while (true) {
+    let token: string
+
+    try {
+      token = await getAccessToken()
+    } catch (erro: any) {
+      if (logarErro) {
+        console.error(`${prefixo} Erro ao obter token`, resumirErroTray(erro))
+      }
+      throw erroTraySanitizado(erro)
+    }
+
     try {
       const response: AxiosResponse<T> =
-        await axios.get(urlFinal, {
+        await axios.get(montarUrl(token), {
           headers: { Accept: 'application/json' },
           timeout: TIMEOUT_MS
         })
@@ -103,6 +225,32 @@ async function buscarPaginaComRetry<T>(
     } catch (erro: any) {
       const status = erro.response?.status
       const codigo = erro.code
+      const errorCode = erro.response?.data?.error_code ?? erro.response?.data?.code
+
+      if (status === 401 && !tokenRenovado) {
+        tokenRenovado = true
+        const detalhe =
+          errorCode !== undefined ? ` (error_code ${errorCode})` : ''
+
+        console.warn(
+          `${prefixo} Token expirado/inválido na página ${pagina}${detalhe}; renovando e repetindo`
+        )
+
+        try {
+          await getAccessToken(true)
+        } catch (erroRenovacao: any) {
+          if (logarErro) {
+            console.error(
+              `${prefixo} Erro ao renovar token na página ${pagina}`,
+              resumirErroTray(erroRenovacao)
+            )
+          }
+          throw erroTraySanitizado(erroRenovacao)
+        }
+
+        continue
+      }
+
       const transitorio =
         STATUS_RETRYABLES.has(status) || CODIGOS_RETRYABLES.has(codigo)
 
@@ -110,10 +258,10 @@ async function buscarPaginaComRetry<T>(
         if (logarErro) {
           console.error(
             `${prefixo} Erro na página ${pagina} (HTTP ${status})`,
-            erro.message
+            resumirErroTray(erro)
           )
         }
-        throw erro
+        throw erroTraySanitizado(erro)
       }
 
       tentativas++
@@ -172,7 +320,6 @@ export async function buscarPedidosTraycommerce(): Promise<
 > {
   console.log('[TRAYCOMMERCE][SYNC] Iniciando busca de pedidos')
 
-  const token = await getAccessToken()
   const { from, to } = getDateRange()
   console.log('[TRAYCOMMERCE][SYNC] Período de busca', { from, to })
 
@@ -203,18 +350,16 @@ export async function buscarPedidosTraycommerce(): Promise<
         continue
       }
 
-      // O access_token vai na query: a API ignora o header Authorization e
-      // devolve 401 "Invalid or expired token" quando so ele é enviado.
-      const urlFinal =
-        `${base}/orders?access_token=${token}` +
-        `&limit=${LIMITE_POR_PAGINA}&page=${pagina}&date=${from},${to}`
-
       console.log('[TRAYCOMMERCE][SYNC] Buscando página', { pagina, from, to })
 
       requisicoes++
 
+      // O access_token vai na query: a API ignora o header Authorization e
+      // devolve 401 "Invalid or expired token" quando so ele é enviado.
       const dados = await buscarPaginaComRetry<TraycommerceOrdersApiResponse>(
-        urlFinal,
+        token =>
+          `${base}/orders?access_token=${token}` +
+          `&limit=${LIMITE_POR_PAGINA}&page=${pagina}&date=${from},${to}`,
         pagina
       )
       const lote = dados?.Orders || []
@@ -279,8 +424,11 @@ export async function buscarPedidosTraycommerce(): Promise<
 
     return pedidos
   } catch (erro) {
-    console.error('[TRAYCOMMERCE][SYNC] Erro ao buscar pedidos', erro)
-    throw erro
+    console.error(
+      '[TRAYCOMMERCE][SYNC] Erro ao buscar pedidos',
+      resumirErroTray(erro)
+    )
+    throw erroTraySanitizado(erro)
   }
 }
 
@@ -304,7 +452,6 @@ function paraNumeroOuNulo(valor: unknown): number | null {
  */
 async function buscarCatalogo(
   base: string,
-  token: string,
   endpoint: 'products' | 'products/variants',
   isVariant: boolean
 ): Promise<TraycommerceStockBody[]> {
@@ -331,10 +478,6 @@ async function buscarCatalogo(
       continue
     }
 
-    const urlFinal =
-      `${base}/${endpoint}?access_token=${token}` +
-      `&limit=${LIMITE_PRODUTOS_POR_PAGINA}&page=${pagina}`
-
     console.log('[TRAYCOMMERCE][PRODUTOS] Buscando página', { endpoint, pagina })
 
     requisicoes++
@@ -343,7 +486,9 @@ async function buscarCatalogo(
 
     try {
       dados = await buscarPaginaComRetry<TraycommerceProductsApiResponse>(
-        urlFinal,
+        token =>
+          `${base}/${endpoint}?access_token=${token}` +
+          `&limit=${LIMITE_PRODUTOS_POR_PAGINA}&page=${pagina}`,
         pagina,
         { prefixo: '[TRAYCOMMERCE][PRODUTOS]', logarErro: !isVariant }
       )
@@ -413,16 +558,10 @@ export async function buscarProdutosTraycommerce(): Promise<
   console.log('[TRAYCOMMERCE][PRODUTOS] Iniciando busca de estoque')
 
   try {
-    const token = await getAccessToken()
     const base = traycommerceConfig.TRAYCOMMERCE_URL.replace(/\/+$/, '')
 
-    const produtos = await buscarCatalogo(base, token, 'products', false)
-    const variantes = await buscarCatalogo(
-      base,
-      token,
-      'products/variants',
-      true
-    )
+    const produtos = await buscarCatalogo(base, 'products', false)
+    const variantes = await buscarCatalogo(base, 'products/variants', true)
 
     const resultado = [...produtos, ...variantes]
 
@@ -434,7 +573,10 @@ export async function buscarProdutosTraycommerce(): Promise<
 
     return resultado
   } catch (erro) {
-    console.error('[TRAYCOMMERCE][PRODUTOS] Erro ao buscar estoque', erro)
-    throw erro
+    console.error(
+      '[TRAYCOMMERCE][PRODUTOS] Erro ao buscar estoque',
+      resumirErroTray(erro)
+    )
+    throw erroTraySanitizado(erro)
   }
 }

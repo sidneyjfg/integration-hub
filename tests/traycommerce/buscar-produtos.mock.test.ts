@@ -76,6 +76,10 @@ function criarAxiosMock(options: {
   products?: RespostaMock[]
   variants?: RespostaMock[]
   token?: string
+  refreshToken?: string
+  falharRenovacao?: boolean
+  /** Chave `${tipo}:${pagina}` -> respostas por tentativa (1-based). */
+  respostasPorTentativa?: Record<string, RespostaMock[]>
 }) {
   const products = options.products ?? []
   const variants = options.variants ?? []
@@ -84,21 +88,47 @@ function criarAxiosMock(options: {
     pagina: number
     url: string
   }> = []
+  const autenticacoes: Array<{ metodo: 'POST' | 'GET'; url?: string }> = []
+  const tentativasPorPagina = new Map<string, number>()
+  let renovacoes = 0
 
   return {
     requisicoes,
+    autenticacoes,
 
     get: async (url: string) => {
       const parsed = new URL(url)
+
+      if (parsed.pathname.endsWith('/auth')) {
+        autenticacoes.push({ metodo: 'GET', url })
+
+        if (options.falharRenovacao) {
+          throw erroAxios('Request failed with status code 401', 401)
+        }
+
+        return {
+          status: 200,
+          data: {
+            access_token: `token-renovado-${++renovacoes}`,
+            refresh_token: options.refreshToken ?? 'refresh-token-renovado'
+          }
+        }
+      }
+
       const tipo = parsed.pathname.includes('/products/variants')
         ? 'variants'
         : 'products'
       const pagina = Number(parsed.searchParams.get('page') ?? '1')
+      const chave = `${tipo}:${pagina}`
+      const tentativa = (tentativasPorPagina.get(chave) ?? 0) + 1
 
+      tentativasPorPagina.set(chave, tentativa)
       requisicoes.push({ tipo, pagina, url })
 
       const paginas = tipo === 'variants' ? variants : products
-      const resposta = paginas[pagina - 1]
+      const resposta =
+        options.respostasPorTentativa?.[chave]?.[tentativa - 1] ??
+        paginas[pagina - 1]
 
       if (!resposta) {
         return {
@@ -117,10 +147,17 @@ function criarAxiosMock(options: {
       return { status: 200, data: resposta }
     },
 
-    post: async () => ({
-      status: 200,
-      data: { access_token: options.token ?? 'token-traycommerce' }
-    })
+    post: async (url?: string) => {
+      autenticacoes.push({ metodo: 'POST', url })
+
+      return {
+        status: 200,
+        data: {
+          access_token: options.token ?? 'token-traycommerce',
+          refresh_token: options.refreshToken ?? 'refresh-token-traycommerce'
+        }
+      }
+    }
   }
 }
 
@@ -148,6 +185,8 @@ export = async function runBuscarProdutosTraycommerceMockTest(): Promise<void> {
   await casoProdutosComVariantes()
   await casoPaginacaoDoCatalogo()
   await casoNormalizaCampos()
+  await casoTokenExpiradoRenovaERetomaPagina()
+  await casoRenovacaoFalhaMantemErro()
   await casoErroEmProductsPropaga()
 }
 
@@ -255,6 +294,69 @@ async function casoNormalizaCampos(): Promise<void> {
   assert.equal(p30.stock, 12, 'stock string precisa virar number')
   assert.equal(p31.stock, null, 'stock vazio precisa ser null, nunca 0')
   assert.equal(p32.name, null)
+}
+
+/** Token vencido no meio da paginação: renova e repete a mesma página. */
+async function casoTokenExpiradoRenovaERetomaPagina(): Promise<void> {
+  const pagina2 = criarPaginaProdutos([{ id: 2, reference: 'SKU-2' }], 2)
+  const axiosMock = criarAxiosMock({
+    products: [
+      criarPaginaProdutos([{ id: 1, reference: 'SKU-1' }], 2),
+      pagina2
+    ],
+    variants: [],
+    respostasPorTentativa: {
+      'products:2': [{ status: 401 }, pagina2]
+    }
+  })
+  const cliente = await carregarCliente(axiosMock)
+
+  const estoque = await cliente.buscarProdutosTraycommerce()
+
+  assert.deepEqual(
+    estoque.map(p => p.reference),
+    ['SKU-1', 'SKU-2']
+  )
+  assert.deepEqual(
+    axiosMock.requisicoes
+      .filter(r => r.tipo === 'products')
+      .map(r => r.pagina),
+    [1, 2, 2],
+    'a página que tomou 401 precisa ser repetida uma vez'
+  )
+  assert.equal(
+    axiosMock.autenticacoes.filter(a => a.metodo === 'GET').length,
+    1,
+    'o 401 precisa disparar uma renovação via refresh_token'
+  )
+}
+
+/** Se refresh e code não resolverem, o 401 continua propagando. */
+async function casoRenovacaoFalhaMantemErro(): Promise<void> {
+  const axiosMock = criarAxiosMock({
+    products: [{ status: 401 }],
+    variants: [],
+    falharRenovacao: true
+  })
+  const cliente = await carregarCliente(axiosMock)
+
+  await silenciandoErros(async () => {
+    await assert.rejects(
+      () => cliente.buscarProdutosTraycommerce(),
+      /status code 401/
+    )
+  })
+
+  assert.deepEqual(
+    axiosMock.autenticacoes.map(a => a.metodo),
+    ['POST', 'GET', 'POST'],
+    'deve tentar refresh_token e cair para o code'
+  )
+  assert.equal(
+    axiosMock.requisicoes.filter(r => r.tipo === 'products').length,
+    2,
+    'só pode repetir a página uma vez'
+  )
 }
 
 /** Falha real em /products (não 404 de grade) tem que propagar. */

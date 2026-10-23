@@ -13,7 +13,7 @@ export async function executarCronPedidos(_coreConfig: CoreEnv) {
     // erro e o erro é relançado para o log do core continuar registrando.
     const mensagem = erro instanceof Error ? erro.message : String(erro)
 
-    console.error('[TRAYCOMMERCE][CRON] Falha ao sincronizar pedidos', erro)
+    console.error('[TRAYCOMMERCE][CRON] Falha ao sincronizar pedidos', mensagem)
 
     await notifyGoogleChatError(
       `Falha no monitoramento de pedidos.\n` +
@@ -31,7 +31,7 @@ export async function executarCronProdutos(_coreConfig: CoreEnv) {
   } catch (erro) {
     const mensagem = erro instanceof Error ? erro.message : String(erro)
 
-    console.error('[TRAYCOMMERCE][CRON] Falha ao sincronizar estoque', erro)
+    console.error('[TRAYCOMMERCE][CRON] Falha ao sincronizar estoque', mensagem)
 
     await notifyGoogleChatError(
       `Falha no monitoramento de estoque.\n` +
