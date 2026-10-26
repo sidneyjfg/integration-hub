@@ -1,6 +1,7 @@
 import {
   salvarNotasTmpMercadoLivre,
   buscarNotasNaoIntegradasNerusPorChaves,
+  buscarPedidosPendentesPorChavesNotas,
   verificarECriarTabelaTmpNotas,
   buscarCredenciaisMercadoLivre,
   getRetryCountFfpreprocnf,
@@ -15,6 +16,7 @@ import { buscarNotasMercadoLivre } from "../api/buscar-notas-mercadolivre";
 import { mercadolivreConfig } from "../env.schema";
 import { buildNotasNaoIntegradasCard } from "../notifications/build-notas-notification";
 import { PeriodoNotasMercadoLivre } from "../repositories/mercadolivre-notas.repository";
+import { reenviarPedidosPendentesNotasMercadoLivre } from './reenviar-pedidos-notas-mercadolivre'
 
 interface RetryResult {
   notasParaRevisao: Array<{ CHAVE_NFE?: string }>;
@@ -170,6 +172,16 @@ export async function sincronizarNotasMercadoLivre(): Promise<{
         });
 
         if (notasNaoIntegradas.length > 0) {
+          const pedidosPendentes = await buscarPedidosPendentesPorChavesNotas(
+            notasNaoIntegradas
+              .map(nota => String(nota.CHAVE_NFE ?? ''))
+              .filter(Boolean),
+          )
+          const reenvioPedidos = await reenviarPedidosPendentesNotasMercadoLivre(
+            pedidosPendentes,
+            conta,
+          )
+
           const { notasParaRevisao, zeradas } =
             await processarRetryNotasNaoIntegradas(notasNaoIntegradas);
 
@@ -180,7 +192,12 @@ export async function sincronizarNotasMercadoLivre(): Promise<{
           }
 
           if (notasParaRevisao.length > 0) {
-            const mensagemRevisao = `${notasParaRevisao.length} nota(s) do Mercado Livre excederam o limite de tentativas ou falharam e precisam de revisão manual no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}).`;
+            const resumoReenvio = reenvioPedidos.executado
+              ? ` Reenviados: ${reenvioPedidos.reenviados.length}; falhas no reenvio: ${reenvioPedidos.falhas.length}.`
+              : pedidosPendentes.length > 0
+                ? ' Reenvio desativado: configure MERCADOLIVRE_NOTIFICATION_URL.'
+                : ''
+            const mensagemRevisao = `${notasParaRevisao.length} nota(s) do Mercado Livre não integradas no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}). Pedidos pendentes: ${pedidosPendentes.length}.${resumoReenvio}`;
 
             if (notasParaRevisao.length > 300) {
               await notifyGoogleChatError(`❌ ${mensagemRevisao}`);
@@ -194,6 +211,15 @@ export async function sincronizarNotasMercadoLivre(): Promise<{
             // );
 
             // await notifyGoogleChatWarning(card);
+          }
+
+          if (notasParaRevisao.length === 0 && pedidosPendentes.length > 0) {
+            await notifyGoogleChatWarning(
+              `⚠️ ${notasNaoIntegradas.length} nota(s) do Mercado Livre ainda não aparecem no Nérus. Pedidos pendentes: ${pedidosPendentes.length}.` +
+              (reenvioPedidos.executado
+                ? ` Reenviados: ${reenvioPedidos.reenviados.length}; falhas no reenvio: ${reenvioPedidos.falhas.length}.`
+                : ' Reenvio desativado: configure MERCADOLIVRE_NOTIFICATION_URL.'),
+            )
           }
         } else {
           await notifyGoogleChat(

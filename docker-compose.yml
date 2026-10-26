@@ -52,6 +52,8 @@ services:
       # MERCADO LIVRE
       MERCADOLIVRE_CLIENT_ID:
       MERCADOLIVRE_CLIENT_SECRET:
+      # Endpoint receive-notification do Nérus para reenvio de pedidos pendentes
+      MERCADOLIVRE_NOTIFICATION_URL: ""
 
       # Tokens separados por vírgula (1 para cada CLIENTE_ID)
       MERCADOLIVRE_ACCESS_TOKEN:

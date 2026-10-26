@@ -391,6 +391,47 @@ export async function buscarNotasNaoIntegradasNerusPorChaves(
 }
 
 /**
+ * Retorna os pedidos das notas ainda não integradas que não aparecem no
+ * vínculo do ERP. A consulta fica limitada às chaves da conta/ciclo e usa
+ * ordnoweb (índice já usado pelos demais hubs) para não varrer o histórico.
+ */
+export async function buscarPedidosPendentesPorChavesNotas(
+  chaves: string[]
+): Promise<string[]> {
+  if (!chaves.length) return []
+
+  const placeholders = chaves.map(() => '?').join(', ')
+  const lojas = coreConfig.STORENOS
+    .split(',')
+    .map(id => `'${id.trim()}'`)
+    .join(', ')
+  const sql = `
+    SELECT DISTINCT TRIM(t.venda_remesa) AS pedido
+      FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas t
+     WHERE t.chave IN (${placeholders})
+       AND t.venda_remesa IS NOT NULL
+       AND TRIM(t.venda_remesa) REGEXP '^2000[0-9]+$'
+       AND NOT EXISTS (
+         SELECT 1
+           FROM ${coreConfig.DB_NAME_DADOS}.eordchannelp e
+          WHERE e.ordnoweb = TRIM(t.venda_remesa)
+            AND e.storeno IN (${lojas})
+       )
+     ORDER BY pedido
+  `
+
+  const [rows] = await poolMonitoramento.query(sql, chaves)
+  const pedidos = (rows as Array<{ pedido?: string | number }>).map(row => String(row.pedido ?? '')).filter(Boolean)
+
+  console.log('[MERCADOLIVRE][DB] Pedidos pendentes vinculados às notas', {
+    chavesConsultadas: chaves.length,
+    pedidosPendentes: pedidos.length,
+  })
+
+  return pedidos
+}
+
+/**
  * 🔁 Lê o retryCount atual da ffpreprocnf
  */
 export async function getRetryCountFfpreprocnf(params: {

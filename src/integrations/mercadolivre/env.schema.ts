@@ -19,6 +19,8 @@ const emptyToUndefined = (v: unknown) => {
 
 export const mercadolivreEnvSchema = z.object({
   CLIENT_NAME: z.string().optional(),
+  MERCADOLIVRE_NOTIFICATION_URL: z
+    .preprocess(emptyToUndefined, z.string().url().optional()),
 
   // SFTP Data
   MERCADOLIVRE_SFTP_HOST: z.string().optional(),

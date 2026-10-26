@@ -31,6 +31,7 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | Variavel | Para que serve | Como usar |
 | --- | --- | --- |
 | `CLIENT_NAME` | Nome exibido nas notificacoes. | Ex: `FG`. |
+| `MERCADOLIVRE_NOTIFICATION_URL` | Endpoint do Nérus para reprocessar pedidos associados a notas não integradas. | Informe a URL completa de `/api/v1/external/mercadolivre/receive-notification`; vazio desativa o reenvio. |
 | `MERCADOLIVRE_SFTP_HOST` | Host do SFTP de destino. | Informe o IP ou hostname. |
 | `MERCADOLIVRE_SFTP_PORT` | Porta do SFTP. | Normalmente `22`. |
 | `MERCADOLIVRE_SFTP_USER` | Usuario do SFTP. | Informe o usuario de acesso. |
