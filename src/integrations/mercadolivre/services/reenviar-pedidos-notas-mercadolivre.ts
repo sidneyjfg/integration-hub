@@ -54,7 +54,7 @@ export async function reenviarPedidosPendentesNotasMercadoLivre(
           application_id: applicationId,
           sent,
           attempts: 1,
-          received,
+          received: recebido,
         }, {
           headers: { 'Content-Type': 'application/json' },
           timeout: 30000,
