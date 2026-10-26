@@ -15,12 +15,13 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | `DB_NAME_MONITORAMENTO` | Banco de tabelas temporarias. | Nome do schema de apoio/temporarios. |
 | `ACTIVE_INTEGRATIONS` | Quais integrações ficam ativas. | Separe por virgula, ex: `anymarket,mercadolivre`. |
 | `STORENOS` | Filtra lojas nas consultas SQL. | Separe por virgula, ex: `1,2,4`. |
-| `CRON_PEDIDOS` | Agenda o cron de pedidos. | Use uma expressao cron valida ou deixe vazio. |
+| `CRON_PEDIDOS` | Agenda o monitoramento de pedidos dos hubs ativos, incluindo Mercado Livre. | Use uma expressao cron valida ou deixe vazio. O Mercado Livre grava em `tmp_order` e `tmp_order_items`, identificados pela coluna `origem`; erros e cursor ficam em `tmp_checkpoint`, com horário do incidente em `incidente_em`. |
 | `CRON_PRODUTOS` | Agenda o cron de produtos. | Use uma expressao cron valida ou deixe vazio. |
 | `CRON_NOTAS_ML` | Agenda a sincronizacao normal do Mercado Livre. | Use uma expressao cron valida ou deixe vazio. |
 | `CRON_NOTAS_SFTP` | Agenda a sincronizacao SFTP do Mercado Livre. | Use uma expressao cron valida ou deixe vazio. |
+| `ATIVA_BUSCA_CS` | Agenda a busca e atualizacao da planilha CS do Mercado Livre. | Use uma expressao cron valida, ex: `0 6 * * *` (diariamente às 06h de São Paulo), ou deixe vazio para desativar. Cada ciclo revalida notas e vendas do dia 1 até D-1 em blocos de até 5 dias e publica cada bloco concluído. O histórico em `busca_cs_diaria` permite gravar apenas totais novos ou alterados. Se um bloco falhar, `busca_cs_checkpoint` retoma no dia anterior ao início dele; uma nova tentativa automática ocorre em 30 minutos. Meses anteriores não são revalidados pelo cron; use a execução manual com uma referência daquele mês. |
 | `USA_ETIQUETA` | Agenda o cron de etiqueta. | Use uma expressao cron valida ou deixe vazio. |
-| `GOOGLE_CHAT_WEBHOOK_URL` | Envia notificacoes para o Google Chat. | Informe a URL completa do webhook. |
+| `GOOGLE_CHAT_WEBHOOK_URL` | Envia as notificacoes de sucesso (o ciclo rodou sem divergencia) para o Google Chat. | Informe a URL completa do webhook. |
 | `GOOGLE_CHAT_WEBHOOK_URL_WARNING` | Envia notificacoes de aviso para o Google Chat. | Informe a URL completa do webhook ou deixe vazio. |
 | `GOOGLE_CHAT_WEBHOOK_URL_ERROR` | Envia notificacoes de erro para o Google Chat. | Informe a URL completa do webhook ou deixe vazio. |
 | `TZ` | Define o fuso horario do processo. | Ex: `America/Sao_Paulo`. |
@@ -30,15 +31,18 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | Variavel | Para que serve | Como usar |
 | --- | --- | --- |
 | `CLIENT_NAME` | Nome exibido nas notificacoes. | Ex: `FG`. |
+| `MERCADOLIVRE_NOTIFICATION_URL` | Endpoint do Nérus para reprocessar pedidos associados a notas não integradas. | Informe a URL completa de `/api/v1/external/mercadolivre/receive-notification`; vazio desativa o reenvio. |
 | `MERCADOLIVRE_SFTP_HOST` | Host do SFTP de destino. | Informe o IP ou hostname. |
 | `MERCADOLIVRE_SFTP_PORT` | Porta do SFTP. | Normalmente `22`. |
 | `MERCADOLIVRE_SFTP_USER` | Usuario do SFTP. | Informe o usuario de acesso. |
 | `MERCADOLIVRE_SFTP_PASSWORD` | Senha do SFTP. | Informe a senha do usuario. |
 | `MERCADOLIVRE_DAYS_TO_FETCH` | Quantos dias voltar na busca de notas. | Ex: `3` para buscar os ultimos 3 dias. |
+| `MERCADOLIVRE_ORDERS_TO_FETCH` | Quantos dias para trás o monitoramento de pedidos do Mercado Livre consulta em cada execução de `CRON_PEDIDOS`. | Número inteiro a partir de `1`; padrão `7`. Os resultados são atualizados de forma idempotente e falhas são registradas em `tmp_checkpoint`; a próxima execução repete a janela configurada. |
 | `ETIQUE_DAYS_TO_FETCH` | Quantos dias considerar na atualizacao do nfcache de etiqueta. | Ex: `3` para atualizar hoje e os 2 dias anteriores. Se vazio, usa `1`. |
 | `MERCADOLIVRE_END_TO_FETCH` | Dia final da busca normal. | Use `0` para fechar em hoje. |
 | `MERCADOLIVRE_END_SFTP` | Dia final da busca SFTP. | Use `0` para fechar em hoje. |
 | `MERCADOLIVRE_MAX_RETRY_COUNT` | Limite de retry para notas nao integradas. | Informe um numero, ex: `5000`. |
+| `DISPONIBILIZA_XML` | Mantem uma copia acumulativa dos XMLs baixados pelo monitoramento normal. | Use `true` ou `false`. Os arquivos ficam no volume Docker `mercadolivre_xmls`, em `/app/notas/disponibilizados/<clienteId>`, e nao sao apagados automaticamente. |
 | `MERCADOLIVRE_SFTP_ENABLED` | Define se o envio usa SFTP. | Use `true` ou `false`. |
 | `MERCADOLIVRE_SFTP_DIR` | Diretorio raiz remoto do envio. | Ex: `/ML_FULL`. |
 | `MERCADOLIVRE_USE_LEDGER` | Ativa controle de enviados. | Use `true` ou `false`. |
@@ -81,3 +85,27 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | --- | --- | --- |
 | `TRAY_URL` | Base da API TrayCorp. | Informe a URL completa. |
 | `TRAY_TOKEN` | Token usado nas chamadas da API. | Informe um token com pelo menos 10 caracteres. |
+
+## TrayCommerce
+
+Hub novo, separado do `TRAYCORP` (que continua atendendo a Wake).
+
+| Variavel | Para que serve | Como usar |
+| --- | --- | --- |
+| `TRAYCOMMERCE_URL` | Base da API TrayCommerce. | Informe a URL completa. |
+| `TRAYCOMMERCE_CONSUMER_KEY` | Consumer key da aplicacao. | Informe a consumer key. |
+| `TRAYCOMMERCE_SECRET_KEY` | Consumer secret da aplicacao. | Informe o consumer secret. |
+| `TRAYCOMMERCE_CODE` | Codigo da loja para autenticacao. | Informe o codigo da loja. |
+| `TRAYCOMMERCE_STORE_ID` | Id da loja. | Informe o store id. Não é enviado ao `/orders`: o token do `/auth` já vem escopado na loja (`APP_ID-xxx-STORE_ID-xxx-...`) e o endpoint não aceita o parametro. |
+| `TRAYCOMMERCE_ORDER_STATUS_TO_GET` | Status (ids) monitorados na busca de pedidos. | Separe por virgula, ex: `1,350,317`. |
+| `NERUS_NOTIFICATION_URL` | Endpoint do Nérus para reenvio (auto-cura) de pedidos não integrados. | URL completa do `receive-notification`, ex: `http://mueller.nerus.com.br:3010/api/v1/order/receive-notification`. Deixe vazio para desativar o reenvio. |
+
+## Wake
+
+Hub da Wake (Fbits). Separado do `TRAYCORP` legado; monitora pedidos, preço e
+estoque (sem nota fiscal e sem reenvio).
+
+| Variavel | Para que serve | Como usar |
+| --- | --- | --- |
+| `WAKE_URL` | Base da API da Wake/Fbits. | Informe `https://api.fbits.net`. |
+| `WAKE_TOKEN` | Token da loja enviado no header `Authorization`. | Informe o token da loja. |

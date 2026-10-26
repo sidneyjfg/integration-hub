@@ -19,6 +19,8 @@ const emptyToUndefined = (v: unknown) => {
 
 export const mercadolivreEnvSchema = z.object({
   CLIENT_NAME: z.string().optional(),
+  MERCADOLIVRE_NOTIFICATION_URL: z
+    .preprocess(emptyToUndefined, z.string().url().optional()),
 
   // SFTP Data
   MERCADOLIVRE_SFTP_HOST: z.string().optional(),
@@ -28,12 +30,16 @@ export const mercadolivreEnvSchema = z.object({
 
   // ⏱️ Período de busca
   MERCADOLIVRE_DAYS_TO_FETCH: z.coerce.number().min(1),
+  MERCADOLIVRE_ORDERS_TO_FETCH: z.preprocess(emptyToUndefined, z.coerce.number().int().min(1).default(7)),
   ETIQUE_DAYS_TO_FETCH: z
     .preprocess(emptyToUndefined, z.coerce.number().int().min(1).default(1)),
   MERCADOLIVRE_END_TO_FETCH: z.coerce.number().min(0).default(0),
   MERCADOLIVRE_END_SFTP: z.coerce.number().min(0).default(0),
   // ⚠️ Comportamentos opcionais
   MERCADOLIVRE_DISPONIBILIZA_XML_DIVERGENTE: z
+    .preprocess(toBool, z.boolean())
+    .default(false),
+  DISPONIBILIZA_XML: z
     .preprocess(toBool, z.boolean())
     .default(false),
   MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP: z

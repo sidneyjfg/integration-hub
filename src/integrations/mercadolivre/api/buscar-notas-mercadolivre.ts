@@ -1,7 +1,10 @@
 import axios from 'axios'
 import fs from 'fs'
+import os from 'os'
+import path from 'path'
 import { pipeline } from 'stream/promises'
 import { parseStringPromise } from 'xml2js'
+import StreamZip from 'node-stream-zip'
 
 import { mercadolivreConfig } from '../env.schema'
 import {
@@ -9,11 +12,13 @@ import {
   deleteFiles,
   extractAllFiles,
   extractOrderDataFromXML,
-  getNotasWorkspace
+  getAllXmlFiles,
+  getNotasWorkspace,
 } from '../utils'
+import { disponibilizarXmls } from '../utils/disponibilizarXmls'
 
 import { MercadoLivreNotaBody } from '../../../shared/types'
-import { refreshAccessToken } from './auth'
+import { cacheAccessToken, getCachedAccessToken, refreshAccessToken } from './auth'
 
 type BuscarNotasParams = {
   clienteId: string
@@ -31,8 +36,276 @@ type BuscarNotasResult = {
   endDate: string
 }
 
+export type ContagemNotasMercadoLivreParams = {
+  clienteId: string
+  clientId: string
+  clientSecret: string
+  accessToken: string
+  refreshToken: string
+  startDate: string
+  endDate: string
+}
+
+export type ContagemNotasMercadoLivreResult = {
+  clienteId: string
+  totalXml: number
+  totalArquivos: number
+  notasPorDia: Record<string, number>
+}
+
+export type ContaNotasMercadoLivre = {
+  clienteId: string
+  clientId: string
+  clientSecret: string
+  accessToken: string
+  refreshToken: string
+}
+
+export async function contarNotasMercadoLivreEmParalelo(
+  contas: ContaNotasMercadoLivre[],
+  periodo: { startDate: string; endDate: string },
+): Promise<ContagemNotasMercadoLivreResult[]> {
+  return Promise.all(
+    contas.map(conta => contarNotasMercadoLivre({ ...conta, ...periodo })),
+  )
+}
+
 const delay = (ms: number) =>
   new Promise(resolve => setTimeout(resolve, ms))
+
+const URL_NOTAS_BATCH = 'https://api.mercadolibre.com/users'
+
+function montarUrlNotasBatch(
+  clienteId: string,
+  startDate: string,
+  endDate: string,
+): string {
+  const params = new URLSearchParams({
+    start: startDate,
+    end: endDate,
+    sale: 'authorized',
+    return: 'authorized',
+    full: 'all',
+    others: 'all',
+    file_types: 'xml',
+    simple_folder: 'false',
+  })
+
+  return `${URL_NOTAS_BATCH}/${encodeURIComponent(clienteId)}/invoices/sites/MLB/batch_request/period/stream?${params.toString()}`
+}
+
+function extrairDataNotaAutorizadaFulfillment(xml: any): string | null {
+  const prot = xml?.nfeProc?.protNFe?.[0]?.infProt?.[0]
+  const infNFe = xml?.nfeProc?.NFe?.[0]?.infNFe?.[0]
+  if (!prot || !infNFe || prot.cStat?.[0] !== '100') return null
+
+  const natOp = String(infNFe.ide?.[0]?.natOp?.[0] ?? '')
+  const natNorm = natOp.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  if (natNorm.includes('Venda de mercadoria para consumidor final')) return null
+
+  const emissao = String(infNFe.ide?.[0]?.dhEmi?.[0] ?? '').slice(0, 10).replace(/-/g, '')
+  return /^\d{8}$/.test(emissao) ? emissao : null
+}
+
+export async function contarNotasMercadoLivre(
+  params: ContagemNotasMercadoLivreParams,
+): Promise<ContagemNotasMercadoLivreResult> {
+  for (let tentativa = 1; ; tentativa++) {
+    try {
+      return await contarNotasMercadoLivreUmaVez(params)
+    } catch (erro: any) {
+      const status = erro?.response?.status
+      const transitorio = status === 429 || status >= 500 || ['ECONNABORTED', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN'].includes(erro?.code) || isRetryableZipError(erro)
+      if (!transitorio || tentativa >= 3) throw erro
+      const retryAfter = Number(erro?.response?.headers?.['retry-after'])
+      const esperaMs = Math.max(tentativa * 5000, Number.isFinite(retryAfter) ? retryAfter * 1000 : 0)
+      console.warn('[BUSCA-CS][API] Repetindo contagem após falha transitória', { clienteId: params.clienteId, tentativa, status, esperaMs })
+      await delay(esperaMs)
+    }
+  }
+}
+
+async function contarNotasMercadoLivreUmaVez(
+  params: ContagemNotasMercadoLivreParams,
+): Promise<ContagemNotasMercadoLivreResult> {
+  const url = montarUrlNotasBatch(
+    params.clienteId,
+    params.startDate,
+    params.endDate,
+  )
+  const pastaTemporaria = await fs.promises.mkdtemp(
+    path.join(os.tmpdir(), 'mercadolivre-contagem-'),
+  )
+  const zipPath = path.join(pastaTemporaria, 'notas.zip')
+  const pastaXml = path.join(pastaTemporaria, 'xml')
+
+  try {
+    let accessToken = getCachedAccessToken(params.clienteId) ?? params.accessToken
+    let response
+
+    for (let tentativa = 1; tentativa <= 2; tentativa++) {
+      try {
+        response = await axios.get<ArrayBuffer>(url, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          responseType: 'arraybuffer',
+          maxContentLength: 200 * 1024 * 1024,
+          maxBodyLength: 200 * 1024 * 1024,
+          timeout: 120_000,
+        })
+        break
+      } catch (erro: any) {
+        if (erro?.response?.status !== 401 || tentativa === 2) throw erro
+
+        accessToken = await refreshAccessToken({
+          clientId: params.clientId,
+          clientSecret: params.clientSecret,
+          refreshToken: params.refreshToken,
+          clienteId: params.clienteId,
+        })
+      }
+    }
+
+    if (!response) throw new Error(`Não foi possível obter o ZIP da conta ${params.clienteId}`)
+
+    await fs.promises.writeFile(zipPath, Buffer.from(response.data))
+
+    const zip = new StreamZip.async({ file: zipPath })
+    try {
+      await fs.promises.mkdir(pastaXml, { recursive: true })
+      await zip.extract(null, pastaXml)
+      const arquivosXml = await getAllXmlFiles(pastaXml)
+      const notasPorDia: Record<string, number> = {}
+      let ctesIgnorados = 0
+
+      for (const arquivoXml of arquivosXml) {
+        // Ignorar apenas CT-e. Outros tipos de documento dentro de
+        // "Outros documentos" continuam sendo processados normalmente.
+        if (/(?:^|[\\/])CT(?:-|_|)?e(?:[\\/]|$)/i.test(arquivoXml)) {
+          ctesIgnorados++
+          continue
+        }
+        try {
+          const xml = await fs.promises.readFile(arquivoXml, 'utf8')
+          const emissao = extrairDataNotaAutorizadaFulfillment(await parseStringPromise(xml))
+          if (emissao) notasPorDia[emissao] = (notasPorDia[emissao] ?? 0) + 1
+        } catch (erro) {
+          console.error('[MERCADOLIVRE][CONTAGEM] XML inválido; apuração interrompida', {
+            clienteId: params.clienteId,
+            arquivo: arquivoXml,
+            erro: erro instanceof Error ? erro.message : String(erro),
+          })
+          throw erro
+        }
+      }
+
+      if (ctesIgnorados > 0) {
+        console.log('[MERCADOLIVRE][CONTAGEM] Arquivos CT-e ignorados', {
+          clienteId: params.clienteId,
+          quantidade: ctesIgnorados,
+        })
+      }
+
+      return {
+        clienteId: params.clienteId,
+        totalXml: Object.values(notasPorDia).reduce((total, quantidade) => total + quantidade, 0),
+        totalArquivos: arquivosXml.length,
+        notasPorDia,
+      }
+    } finally {
+      await zip.close().catch(() => {})
+    }
+  } finally {
+    await fs.promises.rm(pastaTemporaria, { recursive: true, force: true }).catch(() => {})
+  }
+}
+
+const MAX_ZIP_DOWNLOAD_ATTEMPTS = 3
+
+function isRetryableZipError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+
+  return /bad archive|arquivo zip inv[aá]lido|zip vazio|incompleto|archive read error|unexpected end/i.test(
+    message
+  )
+}
+
+async function baixarEExtrairZip(
+  url: string,
+  headers: { Authorization: string },
+  zipPath: string,
+  outputDir: string,
+  xmlDir: string,
+  clienteId: string,
+  includeOtherErp: boolean
+): Promise<string[]> {
+  let ultimoErro: unknown
+
+  for (let tentativa = 1; tentativa <= MAX_ZIP_DOWNLOAD_ATTEMPTS; tentativa++) {
+    const temporaryZipPath = `${zipPath}.${process.pid}.${Date.now()}.${tentativa}.part`
+
+    try {
+      console.log('[MERCADOLIVRE][DOWNLOAD] Iniciando ZIP', {
+        clienteId,
+        tentativa,
+        totalTentativas: MAX_ZIP_DOWNLOAD_ATTEMPTS
+      })
+
+      const response = await axios.get(url, {
+        headers,
+        responseType: 'stream'
+      })
+
+      console.log('[MERCADOLIVRE][DOWNLOAD] Status', {
+        clienteId,
+        tentativa,
+        status: response.status,
+        contentType: response.headers?.['content-type'],
+        contentLength: response.headers?.['content-length']
+      })
+
+      await pipeline(response.data, fs.createWriteStream(temporaryZipPath))
+
+      const zipStats = await fs.promises.stat(temporaryZipPath)
+      if (zipStats.size < 4) {
+        throw new Error(`ZIP vazio ou incompleto (${zipStats.size} bytes)`)
+      }
+
+      // O nome final só passa a existir depois que o download terminou.
+      await fs.promises.rename(temporaryZipPath, zipPath)
+
+      console.log('[MERCADOLIVRE][ZIP] Download finalizado', {
+        clienteId,
+        zipPath,
+        bytes: zipStats.size,
+        tentativa
+      })
+
+      return await extractAllFiles(zipPath, outputDir, includeOtherErp)
+    } catch (error) {
+      ultimoErro = error
+
+      await fs.promises.rm(temporaryZipPath, { force: true }).catch(() => {})
+
+      if (!isRetryableZipError(error) || tentativa === MAX_ZIP_DOWNLOAD_ATTEMPTS) {
+        throw error
+      }
+
+      console.warn('[MERCADOLIVRE][ZIP] Arquivo inválido; repetindo download', {
+        clienteId,
+        tentativa,
+        erro: error instanceof Error ? error.message : String(error)
+      })
+
+      // Remove o ZIP e eventuais XMLs extraídos parcialmente antes da tentativa seguinte.
+      await deleteFiles(zipPath, xmlDir)
+      await delay(1000 * tentativa)
+    }
+  }
+
+  throw ultimoErro instanceof Error
+    ? ultimoErro
+    : new Error('Não foi possível baixar o ZIP do Mercado Livre')
+}
 
 export async function buscarNotasMercadoLivre(
   params: BuscarNotasParams
@@ -77,6 +350,8 @@ export async function buscarNotasMercadoLivre(
     Authorization: `Bearer ${accessToken}`
   }
 
+  cacheAccessToken(clienteId, accessToken)
+
   const { baseDir: outputDir, xmlDir } = getNotasWorkspace(sftpMode)
   const zipPath = `${outputDir}/notas_${clienteId}.zip`
 
@@ -84,34 +359,28 @@ export async function buscarNotasMercadoLivre(
     await deleteFiles(zipPath, xmlDir)
     await fs.promises.mkdir(outputDir, { recursive: true })
 
-    console.log('[MERCADOLIVRE][DOWNLOAD] Iniciando ZIP', { clienteId })
-
-    const response = await axios.get(url, {
+    const extractedFiles = await baixarEExtrairZip(
+      url,
       headers,
-      responseType: 'stream'
-    })
-
-    console.log('[MERCADOLIVRE][DOWNLOAD] Status', {
-      clienteId,
-      status: response.status,
-      contentType: response.headers?.['content-type'],
-      contentLength: response.headers?.['content-length']
-    })
-
-    await pipeline(response.data, fs.createWriteStream(zipPath))
-
-    const zipStats = await fs.promises.stat(zipPath)
-
-    console.log('[MERCADOLIVRE][ZIP] Download finalizado', {
-      zipPath,
-      bytes: zipStats.size
-    })
-
-    const extractedFiles = await extractAllFiles(
       zipPath,
       outputDir,
+      xmlDir,
+      clienteId,
       MERCADOLIVRE_IMPORTA_EMITIDAS_OUTROS_ERP
     )
+
+    if (!sftpMode && mercadolivreConfig.DISPONIBILIZA_XML) {
+      const resultadoDisponibilizacao = await disponibilizarXmls(
+        extractedFiles,
+        outputDir,
+        clienteId,
+      )
+      console.log('[MERCADOLIVRE][XML] Arquivos disponibilizados', {
+        clienteId,
+        copiados: resultadoDisponibilizacao.copiados,
+        existentes: resultadoDisponibilizacao.existentes,
+      })
+    }
 
     console.log('[MERCADOLIVRE][ZIP] Extração concluída', {
       clienteId,

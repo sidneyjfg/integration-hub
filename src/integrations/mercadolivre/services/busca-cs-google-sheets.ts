@@ -1,0 +1,268 @@
+import { google, sheets_v4 } from 'googleapis'
+import { coreConfig } from '../../../core/env.schema'
+import { buscarResumoDiarioBuscaCS } from '../repositories/busca-cs.repository'
+import { buscarCredenciaisMercadoLivre } from '../repositories/mercadolivre-notas.repository'
+import { contarNotasMercadoLivreEmParalelo } from '../api/buscar-notas-mercadolivre'
+
+const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
+const HEADER_NOTAS = 'dia de apuração'
+const HEADER_FATURAMENTO = 'vendas'
+
+export type BuscaCSResult = {
+  aba: string
+  dataApuracao: string
+  inicio: string
+  fim: string
+  totalNotas: number
+  valorBruto: number
+}
+
+function agoraEmSaoPaulo() {
+  const partes = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(new Date())
+  const get = (tipo: string) => partes.find(p => p.type === tipo)?.value ?? ''
+  return { ano: Number(get('year')), mes: Number(get('month')), dia: Number(get('day')) }
+}
+
+function a1Coluna(numero: number): string {
+  let valor = numero + 1
+  let resultado = ''
+  while (valor > 0) {
+    const resto = (valor - 1) % 26
+    resultado = String.fromCharCode(65 + resto) + resultado
+    valor = Math.floor((valor - 1) / 26)
+  }
+  return resultado
+}
+
+function normalizar(texto: unknown): string {
+  return String(texto ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+}
+
+function nomeAba(ano: number, mes: number, tipo: 'Notas' | 'Faturamento') {
+  return `${tipo} ${MESES[mes - 1]}`
+}
+
+function dataAnterior(ano: number, mes: number, dia: number): string {
+  const data = new Date(Date.UTC(ano, mes - 1, dia - 1))
+  return `${data.getUTCFullYear()}${String(data.getUTCMonth() + 1).padStart(2, '0')}${String(data.getUTCDate()).padStart(2, '0')}`
+}
+
+export function resolverD1Atual(): string {
+  const hoje = agoraEmSaoPaulo()
+  return dataAnterior(hoje.ano, hoje.mes, hoje.dia)
+}
+
+export function resolverPeriodoD1(d1: string) {
+  if (!/^\d{8}$/.test(d1)) throw new Error('D-1 deve estar no formato YYYYMMDD')
+  const data = new Date(Date.UTC(Number(d1.slice(0, 4)), Number(d1.slice(4, 6)) - 1, Number(d1.slice(6, 8))))
+  if (data.getUTCFullYear() !== Number(d1.slice(0, 4)) || data.getUTCMonth() + 1 !== Number(d1.slice(4, 6)) || data.getUTCDate() !== Number(d1.slice(6, 8))) throw new Error('D-1 inválido')
+  const amanha = new Date(data)
+  amanha.setUTCDate(amanha.getUTCDate() + 1)
+  const ano = data.getUTCFullYear()
+  const mes = data.getUTCMonth() + 1
+  return {
+    ano, mes, diaApuracao: amanha.getUTCDate(), d1,
+    inicio: `${ano}${String(mes).padStart(2, '0')}01`,
+    fim: `${amanha.getUTCFullYear()}${String(amanha.getUTCMonth() + 1).padStart(2, '0')}${String(amanha.getUTCDate()).padStart(2, '0')}`,
+    diasNoMes: new Date(ano, mes, 0).getDate(),
+  }
+}
+
+function intervaloAba(aba: string, intervalo: string) {
+  return `'${aba.replace(/'/g, "''")}'!${intervalo}`
+}
+
+const CABECALHOS_PROPRIOS = {
+  Notas: ['Dia', 'Total', 'SAP', 'Pendente'],
+  Faturamento: ['Dia da venda', 'Total', 'SAP', 'Pendente'],
+} as const
+
+function credenciaisSheets() {
+  if (!coreConfig.GOOGLE_SHEETS_SPREADSHEET_ID || !coreConfig.GOOGLE_SHEETS_CREDENTIALS_FILE) {
+    throw new Error('Busca CS ativa, mas GOOGLE_SHEETS_SPREADSHEET_ID ou GOOGLE_SHEETS_CREDENTIALS_FILE não foi configurado')
+  }
+  return {
+    spreadsheetId: coreConfig.GOOGLE_SHEETS_SPREADSHEET_ID,
+    auth: new google.auth.GoogleAuth({
+      keyFile: coreConfig.GOOGLE_SHEETS_CREDENTIALS_FILE,
+      scopes: ['https://www.googleapis.com/auth/spreadsheets']
+    })
+  }
+}
+
+async function localizarOuCriarAba(api: sheets_v4.Sheets, spreadsheetId: string, ano: number, mes: number, tipo: 'Notas' | 'Faturamento') {
+  const arquivo = await api.spreadsheets.get({ spreadsheetId, fields: 'sheets(properties(sheetId,title,gridProperties))' })
+  const abas = arquivo.data.sheets ?? []
+  const atual = nomeAba(ano, mes, tipo)
+  const existente = abas.find(a => a.properties?.title === atual)
+  if (existente?.properties?.sheetId != null) {
+    return { sheetId: existente.properties.sheetId, criada: false }
+  }
+
+  const criada = await api.spreadsheets.batchUpdate({
+    spreadsheetId,
+    requestBody: { requests: [{ addSheet: { properties: { title: atual } } }] },
+  })
+  const novoId = criada.data.replies?.[0]?.addSheet?.properties?.sheetId
+  if (novoId == null) throw new Error(`Não foi possível criar a aba ${atual}`)
+  await api.spreadsheets.values.update({
+    spreadsheetId,
+    range: intervaloAba(atual, 'A1:D1'),
+    valueInputOption: 'RAW',
+    requestBody: { values: [[...CABECALHOS_PROPRIOS[tipo]]] },
+  })
+  return { sheetId: novoId, criada: true }
+}
+
+async function encontrarCabecalho(api: sheets_v4.Sheets, spreadsheetId: string, aba: string, tipo: 'Notas' | 'Faturamento') {
+  const resposta = await api.spreadsheets.values.get({ spreadsheetId, range: intervaloAba(aba, 'A1:ZZ100'), valueRenderOption: 'FORMULA' })
+  const valores = resposta.data.values ?? []
+  const headerApuracao = tipo === 'Notas' ? HEADER_NOTAS : HEADER_FATURAMENTO
+  const linha = valores.findIndex(row =>
+    row.some(celula => normalizar(celula) === headerApuracao) ||
+    normalizar(row[0]) === normalizar(CABECALHOS_PROPRIOS[tipo][0]),
+  )
+  if (linha < 0) throw new Error(`Aba ${aba} sem cabeçalho de data`)
+  const cabecalhos = valores[linha] ?? []
+  const dataColuna = cabecalhos.findIndex(c =>
+    normalizar(c) === headerApuracao || normalizar(c) === normalizar(CABECALHOS_PROPRIOS[tipo][0]),
+  )
+  const totalColuna = cabecalhos.findIndex(c => normalizar(c) === normalizar(CABECALHOS_PROPRIOS[tipo][1]))
+  if (dataColuna < 0 || totalColuna < 0) {
+    throw new Error(`Aba ${aba} sem os cabeçalhos necessários da Busca CS`)
+  }
+  return { linha, dataColuna, totalColuna }
+}
+
+async function atualizarAba(
+  api: sheets_v4.Sheets,
+  spreadsheetId: string,
+  aba: string,
+  tipo: 'Notas' | 'Faturamento',
+  resumos: Awaited<ReturnType<typeof buscarResumoDiarioBuscaCS>>,
+  ano: number,
+  mes: number,
+  diasNoMes: number,
+  diaApuracao: number,
+  diasAtualizar?: Set<string>,
+) {
+  const cabecalho = await encontrarCabecalho(api, spreadsheetId, aba, tipo)
+  const valores = await api.spreadsheets.values.get({ spreadsheetId, range: intervaloAba(aba, 'A1:ZZ1000'), valueRenderOption: 'UNFORMATTED_VALUE' })
+  const linhas = valores.data.values ?? []
+  const datas = new Map<string, number>()
+  for (let i = cabecalho.linha + 1; i < linhas.length; i++) {
+    const valor = String(linhas[i]?.[cabecalho.dataColuna] ?? '')
+    if (/^\d{1,2}\/\d{1,2}$/.test(valor)) datas.set(valor.padStart(5, '0'), i)
+  }
+
+  const requests: sheets_v4.Schema$ValueRange[] = []
+  // diaApuracao representa o dia seguinte ao D-1. A linha do dia seguinte
+  // não deve ser preenchida com o mesmo acumulado do D-1.
+  const ultimoDiaPeriodo = diaApuracao === 1 ? diasNoMes : diaApuracao - 1
+  for (let dia = 1; dia <= diasNoMes; dia++) {
+    if (dia > ultimoDiaPeriodo) continue
+    const chave = `${String(dia).padStart(2, '0')}/${String(mes).padStart(2, '0')}`
+    const indiceLinha = datas.get(chave) ?? cabecalho.linha + dia
+    const data = `${String(ano).padStart(4, '0')}${String(mes).padStart(2, '0')}${String(dia).padStart(2, '0')}`
+    const totalAtual = linhas[indiceLinha]?.[cabecalho.totalColuna]
+    const totalPendente = totalAtual == null || String(totalAtual).trim() === ''
+    const deveAtualizar = !diasAtualizar || diasAtualizar.has(data) || totalPendente
+    if (!diasAtualizar || deveAtualizar) {
+      requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.dataColuna)}${indiceLinha + 1}`), values: [[chave]] })
+    }
+    if (deveAtualizar) {
+      const valor = tipo === 'Notas' ? resumos[dia - 1].totalNotas : resumos[dia - 1].valorBruto
+      requests.push({ range: intervaloAba(aba, `${a1Coluna(cabecalho.totalColuna)}${indiceLinha + 1}`), values: [[valor]] })
+    }
+  }
+  return requests
+}
+
+export async function executarBuscaCS(
+  d1?: string,
+  diasParaAtualizar?: string[],
+  valoresBrutoOverride?: Record<string, number>,
+  notasPorDiaOverride?: Record<string, number>,
+): Promise<BuscaCSResult> {
+  const { spreadsheetId, auth } = credenciaisSheets()
+  const api = google.sheets({ version: 'v4', auth })
+  const referencia = resolverPeriodoD1(d1 ?? resolverD1Atual())
+  const { ano, mes, diaApuracao, inicio, fim, diasNoMes } = referencia
+  const resumos = await buscarResumoDiarioBuscaCS(inicio, fim, diasNoMes)
+  const contas = notasPorDiaOverride ? [] : await buscarCredenciaisMercadoLivre()
+  if (!notasPorDiaOverride && !contas.length) throw new Error('Nenhuma conta Mercado Livre encontrada para a contagem da Busca CS')
+
+  const contagens = notasPorDiaOverride ? [] : await contarNotasMercadoLivreEmParalelo(
+    contas.map(conta => ({
+      clienteId: conta.clienteId,
+      clientId: conta.clientId,
+      clientSecret: conta.clientSecret,
+      accessToken: conta.accessToken,
+      refreshToken: conta.refreshToken,
+    })),
+    { startDate: inicio, endDate: fim },
+  )
+  const notasApiPorDia: Record<string, number> = { ...notasPorDiaOverride }
+  for (const contagem of contagens) {
+    for (const [data, quantidade] of Object.entries(contagem.notasPorDia)) {
+      notasApiPorDia[data] = (notasApiPorDia[data] ?? 0) + quantidade
+    }
+  }
+
+  let totalNotasApi = 0
+  for (let dia = 1; dia <= diasNoMes; dia++) {
+    const data = `${String(ano).padStart(4, '0')}${String(mes).padStart(2, '0')}${String(dia).padStart(2, '0')}`
+    totalNotasApi += notasApiPorDia[data] ?? 0
+    resumos[dia - 1].totalNotas = totalNotasApi
+  }
+
+  const ultimoDiaPeriodoApi = diaApuracao === 1 ? diasNoMes : diaApuracao - 1
+  totalNotasApi = resumos[ultimoDiaPeriodoApi - 1].totalNotas
+  console.log('[BUSCA-CS][API] Contagem oficial de XMLs finalizada', {
+    inicio,
+    fim,
+    totalNotas: totalNotasApi,
+    notasPorDia: notasApiPorDia,
+    porConta: contagens.map(contagem => ({
+      clienteId: contagem.clienteId,
+      totalXml: contagem.totalXml,
+    })),
+  })
+  const abaNotas = nomeAba(ano, mes, 'Notas')
+  const abaFaturamento = nomeAba(ano, mes, 'Faturamento')
+  const notasAba = await localizarOuCriarAba(api, spreadsheetId, ano, mes, 'Notas')
+  const faturamentoAba = await localizarOuCriarAba(api, spreadsheetId, ano, mes, 'Faturamento')
+  const diasAtualizar = diasParaAtualizar ? new Set(diasParaAtualizar) : undefined
+  if (valoresBrutoOverride) {
+    for (const [data, valor] of Object.entries(valoresBrutoOverride)) {
+      const indice = Number(data.slice(6, 8)) - 1
+    if (!Number.isFinite(valor) || valor < 0) {
+      throw new Error('Valor bruto do Mercado Livre inválido')
+    }
+      if (data.startsWith(`${ano}${String(mes).padStart(2, '0')}`) && resumos[indice]) {
+        resumos[indice].valorBruto = Number(valor.toFixed(2))
+      }
+    }
+  }
+  const atualizacoesNotas = await atualizarAba(api, spreadsheetId, abaNotas, 'Notas', resumos, ano, mes, diasNoMes, diaApuracao, diasAtualizar)
+  const atualizacoesFaturamento = await atualizarAba(api, spreadsheetId, abaFaturamento, 'Faturamento', resumos, ano, mes, diasNoMes, diaApuracao, diasAtualizar)
+  const atualizacoes = [...atualizacoesNotas, ...atualizacoesFaturamento]
+  if (atualizacoes.length) {
+    await api.spreadsheets.values.batchUpdate({ spreadsheetId, requestBody: { valueInputOption: 'RAW', data: atualizacoes } })
+  }
+
+  const ultimoDiaPeriodo = diaApuracao === 1 ? diasNoMes : diaApuracao - 1
+  const atual = resumos[ultimoDiaPeriodo - 1]
+  const resultado = {
+    aba: `${abaNotas} / ${abaFaturamento}`,
+    dataApuracao: `${String(ultimoDiaPeriodo).padStart(2, '0')}/${String(mes).padStart(2, '0')}`,
+    inicio,
+    fim: referencia.d1,
+    totalNotas: atual.totalNotas,
+    valorBruto: atual.valorBruto,
+  }
+  console.log('[BUSCA-CS][SHEETS] Planilhas atualizadas', resultado)
+  return resultado
+}

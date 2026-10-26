@@ -1,0 +1,582 @@
+// src/integrations/traycommerce/api/traycommerce-client.ts
+import axios, { AxiosResponse } from 'axios'
+import { traycommerceConfig } from '../env.schema'
+import { getDateRange } from '../utils'
+import {
+  TraycommerceOrderApi,
+  TraycommerceOrdersApiResponse,
+  TraycommerceProductsApiResponse,
+  TraycommerceStockBody
+} from '../../../shared/types/traycommerce'
+
+const RATE_LIMIT = 120
+const WINDOW_MS = 60000
+const TIMEOUT_MS = 15000
+const MAX_TENTATIVAS = 5
+const BASE_DELAY_MS = 1000
+const JITTER_MS = 500
+// A API aceita mais, mas corta o que vem acima de 50; 50 evita mandar inutil.
+const LIMITE_POR_PAGINA = 50
+
+// 408 e 5xx sao transitórios, igual ao retry do nerus-sync-hub
+const STATUS_RETRYABLES = new Set([408, 429, 500, 502, 503, 504])
+
+// Falha de rede nao tem status HTTP: o `erro.response` fica undefined e o
+// erro.code traz o motivo. Sem esta lista o timeout reprova na hora, porque
+// nao casa com nenhum status - e uma pagina que deu timeout pode ter
+// respondido logo em seguida.
+const CODIGOS_RETRYABLES = new Set([
+  'ECONNABORTED', // timeout do axios
+  'ETIMEDOUT',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'EAI_AGAIN' // DNS instável
+])
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+// 🔥 Parse único (fora da função)
+const STATUS_MONITORADOS = new Set(
+  (traycommerceConfig.TRAYCOMMERCE_ORDER_STATUS_TO_GET || '')
+    .split(',')
+    .map(s => s.trim())
+    .filter(Boolean)
+)
+
+type TraycommerceAuthResponse = {
+  access_token?: string
+  refresh_token?: string
+}
+
+type TokenCache = {
+  accessToken: string
+  refreshToken: string | null
+}
+
+let tokenCache: TokenCache | null = null
+
+/**
+ * O erro completo do Axios traz `config.url` com o access_token na query.
+ * O log precisa ficar só com o que ajuda a diagnosticar.
+ */
+function resumirErroTray(erro: any) {
+  const dados = erro?.response?.data
+
+  return {
+    status: erro?.response?.status,
+    errorCode: dados?.error_code ?? dados?.code,
+    causes: dados?.causes,
+    message: erro?.message
+  }
+}
+
+function erroTraySanitizado(erro: any): Error {
+  const sanitizado = new Error(erro?.message ?? 'Erro na TrayCommerce') as Error & {
+    code?: string
+    response?: { status?: number; data?: any }
+  }
+
+  sanitizado.code = erro?.code
+
+  if (erro?.response) {
+    sanitizado.response = {
+      status: erro.response.status,
+      data: erro.response.data
+    }
+  }
+
+  return sanitizado
+}
+
+/**
+ * 🔑 Autentica na TrayCommerce e devolve o access token.
+ * A API usa POST /auth com consumer_key, consumer_secret e code.
+ * O refresh_token devolvido aqui é o que permite renovar sem pedir o code de novo.
+ */
+async function autenticarComCode(): Promise<string> {
+  const { TRAYCOMMERCE_URL, TRAYCOMMERCE_CONSUMER_KEY, TRAYCOMMERCE_SECRET_KEY, TRAYCOMMERCE_CODE } =
+    traycommerceConfig
+
+  try {
+    const response: AxiosResponse<TraycommerceAuthResponse> = await axios.post(
+      `${TRAYCOMMERCE_URL.replace(/\/+$/, '')}/auth`,
+      {
+        consumer_key: TRAYCOMMERCE_CONSUMER_KEY,
+        consumer_secret: TRAYCOMMERCE_SECRET_KEY,
+        code: TRAYCOMMERCE_CODE
+      },
+      { timeout: TIMEOUT_MS }
+    )
+
+    const token = response.data?.access_token
+
+    if (!token) {
+      throw new Error('TrayCommerce não retornou access_token')
+    }
+
+    tokenCache = {
+      accessToken: token,
+      refreshToken: response.data?.refresh_token ?? null
+    }
+
+    return token
+  } catch (erro: any) {
+    console.error('[TRAYCOMMERCE][AUTH] Erro ao obter token', resumirErroTray(erro))
+    throw erroTraySanitizado(erro)
+  }
+}
+
+/**
+ * Renova o access_token com o refresh_token salvo. Se a renovação falhar,
+ * cai para o code como última tentativa de recuperar a coleta.
+ */
+async function renovarAccessToken(): Promise<string> {
+  const refreshToken = tokenCache?.refreshToken
+
+  if (!refreshToken) {
+    console.warn('[TRAYCOMMERCE][AUTH] Sem refresh_token; gerando token com code')
+    tokenCache = null
+    return autenticarComCode()
+  }
+
+  try {
+    const base = traycommerceConfig.TRAYCOMMERCE_URL.replace(/\/+$/, '')
+    const response: AxiosResponse<TraycommerceAuthResponse> = await axios.get(
+      `${base}/auth?refresh_token=${encodeURIComponent(refreshToken)}`,
+      { timeout: TIMEOUT_MS }
+    )
+
+    const token = response.data?.access_token
+
+    if (!token) {
+      throw new Error('TrayCommerce não retornou access_token na renovação')
+    }
+
+    tokenCache = {
+      accessToken: token,
+      refreshToken: response.data?.refresh_token ?? refreshToken
+    }
+
+    console.log('[TRAYCOMMERCE][AUTH] Token renovado via refresh_token')
+    return token
+  } catch (erro: any) {
+    console.warn(
+      '[TRAYCOMMERCE][AUTH] Falha ao renovar via refresh_token; tentando code',
+      resumirErroTray(erro)
+    )
+    tokenCache = null
+    return autenticarComCode()
+  }
+}
+
+/**
+ * Devolve o token em cache. Com `forceRefresh`, tenta renovar pelo
+ * refresh_token antes de cair para uma nova autenticação com code.
+ */
+export async function getAccessToken(forceRefresh = false): Promise<string> {
+  if (!forceRefresh && tokenCache?.accessToken) {
+    return tokenCache.accessToken
+  }
+
+  if (forceRefresh) {
+    return renovarAccessToken()
+  }
+
+  return autenticarComCode()
+}
+
+/**
+ * 🔁 Busca uma página com retry e backoff.
+ * A TrayCommerce responde 429 quando o limite de chamadas estoura, mas
+ * 5xx e 408 também são transitórios, então entram no mesmo retry.
+ */
+async function buscarPaginaComRetry<T>(
+  montarUrl: (token: string) => string,
+  pagina: number,
+  opcoes: { prefixo?: string; logarErro?: boolean } = {}
+): Promise<T> {
+  const prefixo = opcoes.prefixo ?? '[TRAYCOMMERCE][SYNC]'
+  const logarErro = opcoes.logarErro ?? true
+  let tentativas = 0
+  let tokenRenovado = false
+
+  while (true) {
+    let token: string
+
+    try {
+      token = await getAccessToken()
+    } catch (erro: any) {
+      if (logarErro) {
+        console.error(`${prefixo} Erro ao obter token`, resumirErroTray(erro))
+      }
+      throw erroTraySanitizado(erro)
+    }
+
+    try {
+      const response: AxiosResponse<T> =
+        await axios.get(montarUrl(token), {
+          headers: { Accept: 'application/json' },
+          timeout: TIMEOUT_MS
+        })
+
+      return response.data
+    } catch (erro: any) {
+      const status = erro.response?.status
+      const codigo = erro.code
+      const errorCode = erro.response?.data?.error_code ?? erro.response?.data?.code
+
+      if (status === 401 && !tokenRenovado) {
+        tokenRenovado = true
+        const detalhe =
+          errorCode !== undefined ? ` (error_code ${errorCode})` : ''
+
+        console.warn(
+          `${prefixo} Token expirado/inválido na página ${pagina}${detalhe}; renovando e repetindo`
+        )
+
+        try {
+          await getAccessToken(true)
+        } catch (erroRenovacao: any) {
+          if (logarErro) {
+            console.error(
+              `${prefixo} Erro ao renovar token na página ${pagina}`,
+              resumirErroTray(erroRenovacao)
+            )
+          }
+          throw erroTraySanitizado(erroRenovacao)
+        }
+
+        continue
+      }
+
+      const transitorio =
+        STATUS_RETRYABLES.has(status) || CODIGOS_RETRYABLES.has(codigo)
+
+      if (!transitorio) {
+        if (logarErro) {
+          console.error(
+            `${prefixo} Erro na página ${pagina} (HTTP ${status})`,
+            resumirErroTray(erro)
+          )
+        }
+        throw erroTraySanitizado(erro)
+      }
+
+      tentativas++
+
+      const motivo =
+        status !== undefined ? `HTTP ${status}` : `código ${codigo ?? 'desconhecido'}`
+
+      if (tentativas > MAX_TENTATIVAS) {
+        throw new Error(
+          `Falha transitória persistente na TrayCommerce (${motivo}) após ${MAX_TENTATIVAS} tentativas`
+        )
+      }
+
+      // Mesma curva do nerus-sync-hub: 1s, 2s, 4s... com um jitter aleatório.
+      const backoff =
+        BASE_DELAY_MS * Math.pow(2, tentativas - 1) +
+        Math.floor(Math.random() * JITTER_MS)
+
+      console.log(
+        `${prefixo} ${motivo} transitório. Tentativa ${tentativas}/${MAX_TENTATIVAS}. Aguardando ${backoff}ms`
+      )
+
+      await sleep(backoff)
+    }
+  }
+}
+
+export type BuscarPedidosTraycommerceResumo = {
+  totalPedidos: number
+  ignorados: number
+  statusIgnorados: string[]
+  /** Janela realmente consultada na API, em YYYYMMDD. A comparação no ERP
+   *  precisa do mesmo recorte, senao a contagem mistura pedidos de dias
+   *  diferentes e o alerta sai com "4 de 2". */
+  from: string
+  to: string
+}
+
+let ultimoResumoBuscaPedidos: BuscarPedidosTraycommerceResumo = {
+  totalPedidos: 0,
+  ignorados: 0,
+  statusIgnorados: Array.from(STATUS_MONITORADOS),
+  from: '',
+  to: ''
+}
+
+export function getUltimoResumoBuscaPedidosTraycommerce(): BuscarPedidosTraycommerceResumo {
+  return ultimoResumoBuscaPedidos
+}
+
+/**
+ * 🔎 Busca pedidos da TrayCommerce paginados, filtrando por data e status.
+ */
+export async function buscarPedidosTraycommerce(): Promise<
+  TraycommerceOrderApi[]
+> {
+  console.log('[TRAYCOMMERCE][SYNC] Iniciando busca de pedidos')
+
+  const { from, to } = getDateRange()
+  console.log('[TRAYCOMMERCE][SYNC] Período de busca', { from, to })
+
+  const pedidos: TraycommerceOrderApi[] = []
+  let pagina = 1
+  let requisicoes = 0
+  let inicioJanela = Date.now()
+  let ignorados = 0
+  let recebidos = 0
+
+  const base = traycommerceConfig.TRAYCOMMERCE_URL.replace(/\/+$/, '')
+
+  try {
+    while (true) {
+      const agora = Date.now()
+
+      if (agora - inicioJanela >= WINDOW_MS) {
+        requisicoes = 0
+        inicioJanela = agora
+      }
+
+      if (requisicoes >= RATE_LIMIT) {
+        const espera = WINDOW_MS - (agora - inicioJanela)
+        console.log(
+          `[TRAYCOMMERCE][SYNC] Rate limit local atingido. Esperando ${Math.ceil(espera / 1000)}s`
+        )
+        await sleep(espera)
+        continue
+      }
+
+      console.log('[TRAYCOMMERCE][SYNC] Buscando página', { pagina, from, to })
+
+      requisicoes++
+
+      // O access_token vai na query: a API ignora o header Authorization e
+      // devolve 401 "Invalid or expired token" quando so ele é enviado.
+      const dados = await buscarPaginaComRetry<TraycommerceOrdersApiResponse>(
+        token =>
+          `${base}/orders?access_token=${token}` +
+          `&limit=${LIMITE_POR_PAGINA}&page=${pagina}&date=${from},${to}`,
+        pagina
+      )
+      const lote = dados?.Orders || []
+
+      console.log('[TRAYCOMMERCE][SYNC] Página recebida', {
+        pagina,
+        registros: lote.length,
+        total: dados?.paging?.total,
+        limitEfetivo: dados?.paging?.limit
+      })
+
+      if (lote.length === 0) {
+        console.log('[TRAYCOMMERCE][SYNC] Página vazia. Fim.')
+        break
+      }
+
+      for (const item of lote) {
+        const o = item.Order
+        const status = String(o?.OrderStatus?.id ?? '').trim()
+
+        if (!STATUS_MONITORADOS.has(status)) {
+          ignorados++
+          continue
+        }
+
+        pedidos.push(o)
+      }
+
+      // A decisão de parar vem depois do processamento do lote: parar antes
+      // descartaria justamente a última página, que é a que costuma fechar a
+      // janela. A resposta já diz quantos pedidos existem, então pedir a
+      // página seguinte depois que `total` saiu é requisição inútil - e se
+      // ela dá timeout, derruba o ciclo mesmo com o resto em mãos. Por isso
+      // a parada é pelo total; a página vazia fica como fallback quando a
+      // API não manda `paging.total`.
+      recebidos += lote.length
+
+      const total = dados?.paging?.total
+
+      if (typeof total === 'number' && total >= 0 && recebidos >= total) {
+        console.log(
+          `[TRAYCOMMERCE][SYNC] Janela completa (${recebidos}/${total}). Fim.`
+        )
+        break
+      }
+
+      pagina++
+    }
+
+    console.log('[TRAYCOMMERCE][SYNC] Busca finalizada', {
+      totalPedidos: pedidos.length,
+      ignorados
+    })
+
+    ultimoResumoBuscaPedidos = {
+      totalPedidos: pedidos.length,
+      ignorados,
+      statusIgnorados: Array.from(STATUS_MONITORADOS),
+      from,
+      to
+    }
+
+    return pedidos
+  } catch (erro) {
+    console.error(
+      '[TRAYCOMMERCE][SYNC] Erro ao buscar pedidos',
+      resumirErroTray(erro)
+    )
+    throw erroTraySanitizado(erro)
+  }
+}
+
+const LIMITE_PRODUTOS_POR_PAGINA = 50
+
+/** `stock` vem como string; `Number('')` é 0 e não null. */
+function paraNumeroOuNulo(valor: unknown): number | null {
+  if (valor === null || valor === undefined || valor === '') {
+    return null
+  }
+
+  const numero = Number(valor)
+
+  return Number.isNaN(numero) ? null : numero
+}
+
+/**
+ * 🔁 Percorre um catálogo paginado (`/products` ou `/products/variants`).
+ * O 404 em `/products/variants` é esperado em loja sem grade: vira lista
+ * vazia, não erro.
+ */
+async function buscarCatalogo(
+  base: string,
+  endpoint: 'products' | 'products/variants',
+  isVariant: boolean
+): Promise<TraycommerceStockBody[]> {
+  const itens: TraycommerceStockBody[] = []
+  let pagina = 1
+  let requisicoes = 0
+  let inicioJanela = Date.now()
+  let recebidos = 0
+
+  while (true) {
+    const agora = Date.now()
+
+    if (agora - inicioJanela >= WINDOW_MS) {
+      requisicoes = 0
+      inicioJanela = agora
+    }
+
+    if (requisicoes >= RATE_LIMIT) {
+      const espera = WINDOW_MS - (agora - inicioJanela)
+      console.log(
+        `[TRAYCOMMERCE][PRODUTOS] Rate limit local atingido. Esperando ${Math.ceil(espera / 1000)}s`
+      )
+      await sleep(espera)
+      continue
+    }
+
+    console.log('[TRAYCOMMERCE][PRODUTOS] Buscando página', { endpoint, pagina })
+
+    requisicoes++
+
+    let dados: TraycommerceProductsApiResponse
+
+    try {
+      dados = await buscarPaginaComRetry<TraycommerceProductsApiResponse>(
+        token =>
+          `${base}/${endpoint}?access_token=${token}` +
+          `&limit=${LIMITE_PRODUTOS_POR_PAGINA}&page=${pagina}`,
+        pagina,
+        { prefixo: '[TRAYCOMMERCE][PRODUTOS]', logarErro: !isVariant }
+      )
+    } catch (erro: any) {
+      if (isVariant && erro.response?.status === 404) {
+        console.log(
+          '[TRAYCOMMERCE][PRODUTOS] Loja sem variações cadastradas (404)'
+        )
+        break
+      }
+
+      throw erro
+    }
+
+    const lote = (isVariant ? dados?.Variants : dados?.Products) || []
+
+    console.log('[TRAYCOMMERCE][PRODUTOS] Página recebida', {
+      endpoint,
+      pagina,
+      registros: lote.length,
+      total: dados?.paging?.total
+    })
+
+    if (lote.length === 0) break
+
+    for (const item of lote) {
+      const produto = 'Product' in item ? item.Product : item.Variant
+      const id = Number(produto?.id)
+      const reference = String(produto?.reference ?? '').trim()
+
+      // Sem id ou sem reference não há como o ERP cruzar a linha.
+      if (!Number.isFinite(id) || !reference) {
+        continue
+      }
+
+      itens.push({
+        id_tray: id,
+        reference,
+        name: produto?.name ?? null,
+        stock: paraNumeroOuNulo(produto?.stock),
+        is_variant: isVariant
+      })
+    }
+
+    recebidos += lote.length
+
+    const total = dados?.paging?.total
+
+    if (typeof total === 'number' && total >= 0 && recebidos >= total) {
+      break
+    }
+
+    pagina++
+  }
+
+  return itens
+}
+
+/**
+ * 📦 Busca o estoque de produtos e variantes da TrayCommerce.
+ * `/products` traz o produto pai; `/products/variants` traz cada grade.
+ * Preço não é coletado aqui — terá um monitoramento próprio.
+ */
+export async function buscarProdutosTraycommerce(): Promise<
+  TraycommerceStockBody[]
+> {
+  console.log('[TRAYCOMMERCE][PRODUTOS] Iniciando busca de estoque')
+
+  try {
+    const base = traycommerceConfig.TRAYCOMMERCE_URL.replace(/\/+$/, '')
+
+    const produtos = await buscarCatalogo(base, 'products', false)
+    const variantes = await buscarCatalogo(base, 'products/variants', true)
+
+    const resultado = [...produtos, ...variantes]
+
+    console.log('[TRAYCOMMERCE][PRODUTOS] Busca finalizada', {
+      produtos: produtos.length,
+      variantes: variantes.length,
+      total: resultado.length
+    })
+
+    return resultado
+  } catch (erro) {
+    console.error(
+      '[TRAYCOMMERCE][PRODUTOS] Erro ao buscar estoque',
+      resumirErroTray(erro)
+    )
+    throw erroTraySanitizado(erro)
+  }
+}

@@ -12,6 +12,18 @@ export type MercadoLivreCredential = {
   refreshToken: string
 }
 
+export type PeriodoNotasMercadoLivre = {
+  inicio: string
+  fim: string
+}
+
+export type PedidoSemValorPedido = {
+  pedido: string
+  emissao: string
+  serie?: string
+  clienteId?: string
+}
+
 /**
  * 🔍 Verifica se a nota já existe no Nérus (nfeavxml)
  */
@@ -55,10 +67,12 @@ async function checkNotaTemporariaExistente(
  * 💾 Insere notas na tabela tmp_notas (idempotente)
  */
 export async function salvarNotasTmpMercadoLivre(
-  notas: MercadoLivreNotaBody[]
+  notas: MercadoLivreNotaBody[],
+  clienteId?: string,
 ): Promise<MercadoLivreNotaBody[]> {
 
   const inseridas: MercadoLivreNotaBody[] = []
+  const diasAlterados = new Set<string>()
 
   let ignoradasSerie = 0
   let ignoradasTipo = 0
@@ -76,8 +90,8 @@ export async function salvarNotasTmpMercadoLivre(
         (status, venda_remesa, NFe, serie, nome, chave,
         modalidade, operacao, tipo_logistico,
         emissao, valor, valor_total, frete,
-        observacao, data_nfe_ref, chave_nfe_ref)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        observacao, data_nfe_ref, chave_nfe_ref, cliente_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
 status =
 CASE
@@ -98,7 +112,8 @@ END,
   frete = COALESCE(VALUES(frete), frete),
   observacao = COALESCE(VALUES(observacao), observacao),
   data_nfe_ref = COALESCE(VALUES(data_nfe_ref), data_nfe_ref),
-  chave_nfe_ref = COALESCE(VALUES(chave_nfe_ref), chave_nfe_ref)
+  chave_nfe_ref = COALESCE(VALUES(chave_nfe_ref), chave_nfe_ref),
+  cliente_id = COALESCE(VALUES(cliente_id), cliente_id)
     `
   let atualizadas = 0
   for (const nota of notas) {
@@ -130,7 +145,8 @@ END,
         nota.frete ?? null,
         nota.observacao ?? null,
         nota.data_nfe_ref ?? null,
-        nota.chave_nfe_ref ?? null
+        nota.chave_nfe_ref ?? null,
+        clienteId ?? null
       ])
 
       const result = res as any
@@ -143,6 +159,10 @@ END,
       if (result.affectedRows === 2) {
         atualizadas++
         console.log('[MERCADOLIVRE][DB] Nota atualizada', nota.chave)
+      }
+
+      if (result.affectedRows > 0 && nota.emissao) {
+        diasAlterados.add(String(nota.emissao))
       }
 
       inseridas.push(nota)
@@ -167,6 +187,7 @@ END,
   })
 
 
+  ;(inseridas as any).diasAlterados = [...diasAlterados]
   return inseridas
 }
 
@@ -189,10 +210,12 @@ export async function verificarECriarTabelaTmpNotas(): Promise<void> {
         emissao varchar(100) DEFAULT NULL,
         valor varchar(100) DEFAULT NULL,
         valor_total varchar(100) DEFAULT NULL,
+        valor_pedido decimal(18,2) DEFAULT NULL,
         frete varchar(100) DEFAULT NULL,
         observacao varchar(100) DEFAULT NULL,
         data_nfe_ref varchar(100) DEFAULT NULL,
         chave_nfe_ref varchar(100) DEFAULT NULL,
+        cliente_id varchar(100) DEFAULT NULL,
         PRIMARY KEY (chave),
         KEY i2 (NFe, serie),
         KEY i3 (chave_nfe_ref),
@@ -201,7 +224,69 @@ export async function verificarECriarTabelaTmpNotas(): Promise<void> {
     `
 
   await poolMonitoramento.execute(sql)
+
   console.log('[MERCADOLIVRE][DB] tmp_notas verificada/criada')
+}
+
+export async function buscarPedidosSemValorPedido(
+  inicio: string,
+  fim: string,
+  serie?: string,
+): Promise<PedidoSemValorPedido[]> {
+  const sql = `
+    SELECT TRIM(venda_remesa) AS pedido,
+           MAX(emissao) AS emissao,
+           serie,
+           cliente_id AS clienteId
+      FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
+     WHERE tipo_logistico = 'Fulfillment'
+       AND emissao >= ?
+       AND emissao < ?
+       AND operacao IN ('Venda de mercadorias', 'Devolucao de mercadorias')
+       AND venda_remesa IS NOT NULL
+       AND TRIM(venda_remesa) <> ''
+       AND valor_pedido IS NULL
+       AND TRIM(venda_remesa) REGEXP '^2000[0-9]+$'
+       ${serie ? 'AND serie = ?' : ''}
+     GROUP BY TRIM(venda_remesa), serie, cliente_id
+  `
+  const params = serie ? [inicio, fim, serie] : [inicio, fim]
+  const [rows] = await poolMonitoramento.query(sql, params)
+  return (rows as any[])
+    .map(row => ({
+      pedido: String(row.pedido),
+      emissao: String(row.emissao ?? ''),
+      serie: row.serie ? String(row.serie) : undefined,
+      clienteId: row.clienteId ? String(row.clienteId) : undefined,
+    }))
+    .filter(row => row.pedido)
+}
+
+export async function salvarValorPedido(
+  pedido: string,
+  valor: number,
+  filtros?: { serie?: string; clienteId?: string },
+): Promise<number> {
+  const conditions = ['venda_remesa = ?', "tipo_logistico = 'Fulfillment'"]
+  const params: Array<string | number> = [valor, pedido]
+
+  if (filtros?.serie) {
+    conditions.push('serie = ?')
+    params.push(filtros.serie)
+  }
+
+  if (filtros?.clienteId) {
+    conditions.push('cliente_id = ?')
+    params.push(filtros.clienteId)
+  }
+
+  const sql = `
+    UPDATE ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas
+       SET valor_pedido = ?
+     WHERE ${conditions.join(' AND ')}
+  `
+  const [result] = await poolMonitoramento.execute(sql, params)
+  return Number((result as any).affectedRows ?? 0)
 }
 
 /**
@@ -303,6 +388,47 @@ export async function buscarNotasNaoIntegradasNerusPorChaves(
   })
 
   return rows as any[]
+}
+
+/**
+ * Retorna os pedidos das notas ainda não integradas que não aparecem no
+ * vínculo do ERP. A consulta fica limitada às chaves da conta/ciclo e usa
+ * ordnoweb (índice já usado pelos demais hubs) para não varrer o histórico.
+ */
+export async function buscarPedidosPendentesPorChavesNotas(
+  chaves: string[]
+): Promise<string[]> {
+  if (!chaves.length) return []
+
+  const placeholders = chaves.map(() => '?').join(', ')
+  const lojas = coreConfig.STORENOS
+    .split(',')
+    .map(id => `'${id.trim()}'`)
+    .join(', ')
+  const sql = `
+    SELECT DISTINCT TRIM(t.venda_remesa) AS pedido
+      FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_notas t
+     WHERE t.chave IN (${placeholders})
+       AND t.venda_remesa IS NOT NULL
+       AND TRIM(t.venda_remesa) REGEXP '^2000[0-9]+$'
+       AND NOT EXISTS (
+         SELECT 1
+           FROM ${coreConfig.DB_NAME_DADOS}.eordchannelp e
+          WHERE e.ordnoweb = TRIM(t.venda_remesa)
+            AND e.storeno IN (${lojas})
+       )
+     ORDER BY pedido
+  `
+
+  const [rows] = await poolMonitoramento.query(sql, chaves)
+  const pedidos = (rows as Array<{ pedido?: string | number }>).map(row => String(row.pedido ?? '')).filter(Boolean)
+
+  console.log('[MERCADOLIVRE][DB] Pedidos pendentes vinculados às notas', {
+    chavesConsultadas: chaves.length,
+    pedidosPendentes: pedidos.length,
+  })
+
+  return pedidos
 }
 
 /**

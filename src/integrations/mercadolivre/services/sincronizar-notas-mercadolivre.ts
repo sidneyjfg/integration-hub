@@ -1,6 +1,7 @@
 import {
   salvarNotasTmpMercadoLivre,
   buscarNotasNaoIntegradasNerusPorChaves,
+  buscarPedidosPendentesPorChavesNotas,
   verificarECriarTabelaTmpNotas,
   buscarCredenciaisMercadoLivre,
   getRetryCountFfpreprocnf,
@@ -14,6 +15,8 @@ import {
 import { buscarNotasMercadoLivre } from "../api/buscar-notas-mercadolivre";
 import { mercadolivreConfig } from "../env.schema";
 import { buildNotasNaoIntegradasCard } from "../notifications/build-notas-notification";
+import { PeriodoNotasMercadoLivre } from "../repositories/mercadolivre-notas.repository";
+import { reenviarPedidosPendentesNotasMercadoLivre } from './reenviar-pedidos-notas-mercadolivre'
 
 interface RetryResult {
   notasParaRevisao: Array<{ CHAVE_NFE?: string }>;
@@ -82,8 +85,15 @@ async function processarRetryNotasNaoIntegradas(
   return resultado;
 }
 
-export async function sincronizarNotasMercadoLivre(): Promise<void> {
+export async function sincronizarNotasMercadoLivre(): Promise<{
+  completo: boolean
+  periodo: PeriodoNotasMercadoLivre | null
+  diasAlterados: string[]
+}> {
   console.log("[MERCADOLIVRE][SYNC] Iniciando sincronização de notas");
+  let houveFalha = false;
+  let periodo: PeriodoNotasMercadoLivre | null = null;
+  const diasAlterados = new Set<string>();
 
   try {
     console.log("[MERCADOLIVRE][SYNC] Verificando tabela tmp_notas");
@@ -110,7 +120,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
       console.log("==============================");
 
       try {
-        const { notas } = await buscarNotasMercadoLivre({
+        const { notas, startDate, endDate } = await buscarNotasMercadoLivre({
           clienteId,
           clientId,
           clientSecret,
@@ -118,6 +128,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
           refreshToken,
           sftpMode: false,
         });
+        periodo ??= { inicio: startDate, fim: endDate };
         const chavesCliente = notas.map((n) => n.chave);
 
         console.log("[MERCADOLIVRE][SYNC][BUSCA FINALIZADA]", {
@@ -141,7 +152,10 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
           chavesExemplo: notas.slice(0, 5).map((n) => n.chave),
         });
 
-        const insertedCount = await salvarNotasTmpMercadoLivre(notas);
+        const insertedCount = await salvarNotasTmpMercadoLivre(notas, clienteId);
+        for (const dia of (insertedCount as any).diasAlterados ?? []) {
+          diasAlterados.add(String(dia));
+        }
 
         console.log("[MERCADOLIVRE][SYNC][DB] Inserção finalizada", {
           clienteId,
@@ -158,6 +172,16 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
         });
 
         if (notasNaoIntegradas.length > 0) {
+          const pedidosPendentes = await buscarPedidosPendentesPorChavesNotas(
+            notasNaoIntegradas
+              .map(nota => String(nota.CHAVE_NFE ?? ''))
+              .filter(Boolean),
+          )
+          const reenvioPedidos = await reenviarPedidosPendentesNotasMercadoLivre(
+            pedidosPendentes,
+            conta,
+          )
+
           const { notasParaRevisao, zeradas } =
             await processarRetryNotasNaoIntegradas(notasNaoIntegradas);
 
@@ -168,7 +192,12 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
           }
 
           if (notasParaRevisao.length > 0) {
-            const mensagemRevisao = `${notasParaRevisao.length} nota(s) do Mercado Livre excederam o limite de tentativas ou falharam e precisam de revisão manual no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}).`;
+            const resumoReenvio = reenvioPedidos.executado
+              ? ` Reenviados: ${reenvioPedidos.reenviados.length}; falhas no reenvio: ${reenvioPedidos.falhas.length}.`
+              : pedidosPendentes.length > 0
+                ? ' Reenvio desativado: configure MERCADOLIVRE_NOTIFICATION_URL.'
+                : ''
+            const mensagemRevisao = `${notasParaRevisao.length} nota(s) do Mercado Livre não integradas no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}). Pedidos pendentes: ${pedidosPendentes.length}.${resumoReenvio}`;
 
             if (notasParaRevisao.length > 300) {
               await notifyGoogleChatError(`❌ ${mensagemRevisao}`);
@@ -183,6 +212,15 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
 
             // await notifyGoogleChatWarning(card);
           }
+
+          if (notasParaRevisao.length === 0 && pedidosPendentes.length > 0) {
+            await notifyGoogleChatWarning(
+              `⚠️ ${notasNaoIntegradas.length} nota(s) do Mercado Livre ainda não aparecem no Nérus. Pedidos pendentes: ${pedidosPendentes.length}.` +
+              (reenvioPedidos.executado
+                ? ` Reenviados: ${reenvioPedidos.reenviados.length}; falhas no reenvio: ${reenvioPedidos.falhas.length}.`
+                : ' Reenvio desativado: configure MERCADOLIVRE_NOTIFICATION_URL.'),
+            )
+          }
         } else {
           await notifyGoogleChat(
             `✅ Todas as notas do Mercado Livre já constam integradas no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME} - Conta ${clienteId}).`,
@@ -193,6 +231,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
           clienteId,
         });
       } catch (erroCliente) {
+        houveFalha = true;
         console.error("[MERCADOLIVRE][SYNC][CLIENTE ERRO]", {
           clienteId,
           erro: erroCliente,
@@ -205,6 +244,7 @@ export async function sincronizarNotasMercadoLivre(): Promise<void> {
     }
 
     console.log("[MERCADOLIVRE][SYNC] Sincronização geral finalizada");
+    return { completo: !houveFalha, periodo, diasAlterados: [...diasAlterados] };
   } catch (erro) {
     console.error("[MERCADOLIVRE][SYNC] ERRO GERAL", erro);
 

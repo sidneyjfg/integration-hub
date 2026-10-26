@@ -6,6 +6,8 @@ type TestCase = {
 }
 
 const tests: TestCase[] = [
+  { name: 'busca CS: revalidação diária e falhas', file: path.resolve(__dirname, 'mercadolivre/busca-cs-diaria.test.ts') },
+  { name: 'busca CS: limite de paginação e fronteiras', file: path.resolve(__dirname, 'mercadolivre/busca-cs-paginacao.test.ts') },
   {
     name: 'unit: filtro de XMLs emitidos',
     file: path.resolve(__dirname, 'mercadolivre/extract-all-files.test.ts')
@@ -57,6 +59,58 @@ const tests: TestCase[] = [
   {
     name: 'integration: pluggto ignora status configurados',
     file: path.resolve(__dirname, 'pluggto/sincronizar-pedidos-status-ignorados.integration.test.ts')
+  },
+  {
+    name: 'repository: traycommerce salvar-pedidos (mock)',
+    file: path.resolve(__dirname, 'traycommerce/salvar-pedidos.mock.test.ts')
+  },
+  {
+    name: 'repository: traycommerce comparacao (mock)',
+    file: path.resolve(__dirname, 'traycommerce/comparar-pedidos.mock.test.ts')
+  },
+  {
+    name: 'client: traycommerce paginacao e retry (mock)',
+    file: path.resolve(__dirname, 'traycommerce/buscar-pedidos.mock.test.ts')
+  },
+  {
+    name: 'client: traycommerce estoque e variantes (mock)',
+    file: path.resolve(__dirname, 'traycommerce/buscar-produtos.mock.test.ts')
+  },
+  {
+    name: 'repository: traycommerce salvar-estoque (mock)',
+    file: path.resolve(__dirname, 'traycommerce/salvar-estoque.mock.test.ts')
+  },
+  {
+    name: 'service: traycommerce reenvio auto-cura (mock)',
+    file: path.resolve(__dirname, 'traycommerce/reenviar-pedidos.mock.test.ts')
+  },
+  {
+    name: 'repository: traycommerce comparacao (MySQL real)',
+    file: path.resolve(__dirname, 'traycommerce/comparar-pedidos.mysql.test.ts')
+  },
+  {
+    name: 'client: wake pedidos paginacao e retry (mock)',
+    file: path.resolve(__dirname, 'wake/buscar-pedidos.mock.test.ts')
+  },
+  {
+    name: 'repository: wake salvar-pedidos (mock)',
+    file: path.resolve(__dirname, 'wake/salvar-pedidos.mock.test.ts')
+  },
+  {
+    name: 'client: wake produtos cursor e headers (mock)',
+    file: path.resolve(__dirname, 'wake/buscar-produtos.mock.test.ts')
+  },
+  {
+    name: 'repository: wake salvar-precos (mock)',
+    file: path.resolve(__dirname, 'wake/salvar-precos.mock.test.ts')
+  },
+  {
+    name: 'service: wake sincronizar-produtos (mock)',
+    file: path.resolve(__dirname, 'wake/sincronizar-produtos.mock.test.ts')
+  },
+  {
+    name: 'repository: wake salvar-estoque (mock)',
+    file: path.resolve(__dirname, 'wake/salvar-estoque.mock.test.ts')
   }
 ]
 
