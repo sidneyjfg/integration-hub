@@ -8,6 +8,7 @@ import {
   salvarCheckpointPedidos,
   salvarPedidoMonitorado,
 } from '../repositories/pedidos.repository'
+import { userIdDoPedidoMercadoLivre } from '../utils/reenvio-rotas'
 
 const espera = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 const diaMs = 24 * 60 * 60 * 1000
@@ -60,6 +61,7 @@ async function sincronizarConta(credencial: any): Promise<{ pedidos: number; cur
   const tokens = new Map<string, string>()
   let offset = 0
   let total = 0
+  let avisouSemUserId = false
 
   while (true) {
     const pagina = await requisitar<RespostaPedidos>('https://api.mercadolibre.com/orders/search', {
@@ -75,8 +77,16 @@ async function sincronizarConta(credencial: any): Promise<{ pedidos: number; cur
     }
 
     for (const pedido of pagina.results) {
+      const userIdPedido = userIdDoPedidoMercadoLivre(pedido.seller?.id, credencial.clienteId)
+      if (!userIdPedido.veioDoPedido && !avisouSemUserId) {
+        avisouSemUserId = true
+        console.warn('[MERCADOLIVRE][PEDIDOS][SYNC] Pedido sem userId; usando a credencial', {
+          pedido: pedido.id,
+          clienteId: credencial.clienteId,
+        })
+      }
       const tipo = await consultarTipoLogistico(pedido.shipping?.id == null ? null : String(pedido.shipping.id), credencial, tokens)
-      await salvarPedidoMonitorado(credencial.clienteId, pedido, tipo)
+      await salvarPedidoMonitorado(userIdPedido.userId, pedido, tipo)
       total++
     }
     offset += pagina.results.length

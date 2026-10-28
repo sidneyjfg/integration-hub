@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { parseRotasReenvioMercadoLivre } from "./utils/reenvio-rotas";
 
 const toBool = (v: unknown) => {
   if (typeof v === "boolean") return v;
@@ -21,6 +22,13 @@ export const mercadolivreEnvSchema = z.object({
   CLIENT_NAME: z.string().optional(),
   MERCADOLIVRE_NOTIFICATION_URL: z
     .preprocess(emptyToUndefined, z.string().url().optional()),
+  MERCADOLIVRE_NOTIFICATION_ROUTES: z.preprocess(
+    parseRotasReenvioMercadoLivre,
+    z.array(z.object({
+      userId: z.string().min(1),
+      url: z.string().url(),
+    })),
+  ),
 
   // SFTP Data
   MERCADOLIVRE_SFTP_HOST: z.string().optional(),
