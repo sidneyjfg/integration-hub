@@ -3,12 +3,17 @@ import { getCachedAccessToken, refreshAccessToken } from '../api/auth'
 import { buscarCredenciaisMercadoLivre } from '../repositories/mercadolivre-notas.repository'
 import { mercadolivreConfig } from '../env.schema'
 import {
+  notifyGoogleChat,
+  notifyGoogleChatWarning,
+} from '../notifications/google-chat'
+import {
   buscarPedidosMercadoLivreNaoIntegrados,
   PedidoMonitorado,
   registrarErroPedidos,
   salvarCheckpointPedidos,
   salvarPedidoMonitorado,
 } from '../repositories/pedidos.repository'
+import { reenviarPedidosPendentesNotasMercadoLivre } from './reenviar-pedidos-notas-mercadolivre'
 import { userIdDoPedidoMercadoLivre } from '../utils/reenvio-rotas'
 
 const espera = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -161,14 +166,15 @@ export async function sincronizarPedidosMercadoLivre(): Promise<void> {
   }
 
   const naoIntegrados = await buscarPedidosMercadoLivreNaoIntegrados()
+  const porLoja = Object.fromEntries(
+    [...new Map(naoIntegrados.map(p => [p.cliente_id, 0])).keys()].map(clienteId => [
+      clienteId,
+      naoIntegrados.filter(p => p.cliente_id === clienteId).length,
+    ]),
+  )
   console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Comparação com Nérus (eordchannelp.ordnoChannel)', {
     naoIntegrados: naoIntegrados.length,
-    porLoja: Object.fromEntries(
-      [...new Map(naoIntegrados.map(p => [p.cliente_id, 0])).keys()].map(clienteId => [
-        clienteId,
-        naoIntegrados.filter(p => p.cliente_id === clienteId).length,
-      ]),
-    ),
+    porLoja,
     exemplos: naoIntegrados.slice(0, 10).map(p => ({
       clienteId: p.cliente_id,
       pedido: p.pedido_id,
@@ -177,12 +183,62 @@ export async function sincronizarPedidosMercadoLivre(): Promise<void> {
     })),
   })
 
+  let reenviadosTotal = 0
+  let falhasReenvio = 0
+  let reenvioExecutado = false
+
+  if (naoIntegrados.length === 0) {
+    console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Todos os pedidos monitorados estão no Nérus')
+    await notifyGoogleChat(
+      `✅ Todos os pedidos do Mercado Livre monitorados constam no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME}).`,
+    )
+  } else {
+    const porCliente = new Map<string, string[]>()
+    for (const pedido of naoIntegrados) {
+      const lista = porCliente.get(pedido.cliente_id) ?? []
+      lista.push(pedido.pedido_id)
+      porCliente.set(pedido.cliente_id, lista)
+    }
+
+    for (const [clienteId, pedidos] of porCliente) {
+      const conta = credenciais.find(c => String(c.clienteId) === clienteId)
+      if (!conta) {
+        console.error('[MERCADOLIVRE][PEDIDOS][SYNC] Sem credencial para reenvio', {
+          clienteId,
+          pedidos: pedidos.length,
+        })
+        falhasReenvio += pedidos.length
+        continue
+      }
+
+      const reenvio = await reenviarPedidosPendentesNotasMercadoLivre(pedidos, conta)
+      if (reenvio.executado) reenvioExecutado = true
+      reenviadosTotal += reenvio.reenviados.length
+      falhasReenvio += reenvio.falhas.length
+    }
+
+    const resumoReenvio = reenvioExecutado
+      ? ` Reenviados: ${reenviadosTotal}; falhas no reenvio: ${falhasReenvio}.`
+      : ' Reenvio desativado: configure MERCADOLIVRE_NOTIFICATION_URL ou MERCADOLIVRE_NOTIFICATION_ROUTES.'
+
+    const resumoLojas = Object.entries(porLoja)
+      .map(([clienteId, total]) => `${clienteId}=${total}`)
+      .join(', ')
+
+    await notifyGoogleChatWarning(
+      `⚠️ ${naoIntegrados.length} pedido(s) do Mercado Livre não integrados no Nérus (Cliente: ${mercadolivreConfig.CLIENT_NAME}). Por loja: ${resumoLojas}.${resumoReenvio}`,
+    )
+  }
+
   console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Monitoramento multi-loja finalizado', {
     lojas: contas.length,
     sucessos,
     falhas,
     pedidosTotal,
     naoIntegrados: naoIntegrados.length,
+    reenviados: reenviadosTotal,
+    falhasReenvio,
+    reenvioExecutado,
   })
 
   if (falhas) throw new Error(`Monitoramento de pedidos ML falhou em ${falhas} conta(s); erros registrados no checkpoint`)
