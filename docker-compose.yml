@@ -54,6 +54,8 @@ services:
       MERCADOLIVRE_CLIENT_SECRET:
       # Endpoint receive-notification do Nérus para reenvio de pedidos pendentes
       MERCADOLIVRE_NOTIFICATION_URL: ""
+      # Opcional. Vazio mantém só a URL acima. Formato: userId|url;userId|url
+      MERCADOLIVRE_NOTIFICATION_ROUTES: ""
 
       # Tokens separados por vírgula (1 para cada CLIENTE_ID)
       MERCADOLIVRE_ACCESS_TOKEN:

@@ -41,6 +41,10 @@ const tests: TestCase[] = [
     file: path.resolve(__dirname, 'mercadolivre/atualizar-nfcache-etiqueta.integration.test.ts')
   },
   {
+    name: 'unit: reenvio ML por userId',
+    file: path.resolve(__dirname, 'mercadolivre/reenvio-rotas.test.ts')
+  },
+  {
     name: 'integration: pluggto buscar-pedidos com filtro de status',
     file: path.resolve(__dirname, 'pluggto/buscar-pedidos.integration.test.ts')
   },

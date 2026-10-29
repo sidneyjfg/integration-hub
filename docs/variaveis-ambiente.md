@@ -32,6 +32,7 @@ Somente as variaveis que existem no schema e sao usadas no codigo atual.
 | --- | --- | --- |
 | `CLIENT_NAME` | Nome exibido nas notificacoes. | Ex: `FG`. |
 | `MERCADOLIVRE_NOTIFICATION_URL` | Endpoint do Nérus para reprocessar pedidos associados a notas não integradas. | Informe a URL completa de `/api/v1/external/mercadolivre/receive-notification`; vazio desativa o reenvio. |
+| `MERCADOLIVRE_NOTIFICATION_ROUTES` | URLs de reenvio por `userId` da `userfull`, para cliente com mais de uma loja. | Vazio mantém só `MERCADOLIVRE_NOTIFICATION_URL`. Preenchido, cada rota é `userId\|url`, separadas por `;`. Ex.: `123456789\|http://loja1.../receive-notification;987654321\|http://loja2.../receive-notification`. O `userId` é o da `userfull` (o mesmo do pedido). `clientId` e loja não entram aqui: saem da `userfull` na hora do reenvio. |
 | `MERCADOLIVRE_SFTP_HOST` | Host do SFTP de destino. | Informe o IP ou hostname. |
 | `MERCADOLIVRE_SFTP_PORT` | Porta do SFTP. | Normalmente `22`. |
 | `MERCADOLIVRE_SFTP_USER` | Usuario do SFTP. | Informe o usuario de acesso. |

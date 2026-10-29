@@ -10,6 +10,7 @@ export type MercadoLivreCredential = {
   clientSecret: string
   accessToken: string
   refreshToken: string
+  storeno?: string | number | null
 }
 
 export type PeriodoNotasMercadoLivre = {
@@ -538,4 +539,27 @@ export async function buscarCredenciaisMercadoLivre(): Promise<MercadoLivreCrede
   const [rows] = await poolMain.query(sql)
 
   return rows as MercadoLivreCredential[]
+}
+
+/** Loja da userfull. Só o reenvio com rotas usa; notas e SFTP não chamam. */
+export async function buscarLojasPorUserIdMercadoLivre(): Promise<Map<string, string | number | null>> {
+  const sql = `
+      SELECT
+        u.userId AS clienteId,
+        u.storeno AS storeno
+      FROM ${coreConfig.DB_NAME_DADOS}.userfull u
+      WHERE u.accessToken IS NOT NULL
+        AND u.refreshToken IS NOT NULL
+    `
+
+  const [rows] = await poolMain.query(sql)
+  const lojas = new Map<string, string | number | null>()
+
+  for (const row of rows as Array<{ clienteId?: string | number | null; storeno?: string | number | null }>) {
+    const userId = String(row.clienteId ?? '').trim()
+    if (!userId || lojas.has(userId)) continue
+    lojas.set(userId, row.storeno ?? null)
+  }
+
+  return lojas
 }

@@ -3,11 +3,13 @@ import { getCachedAccessToken, refreshAccessToken } from '../api/auth'
 import { buscarCredenciaisMercadoLivre } from '../repositories/mercadolivre-notas.repository'
 import { mercadolivreConfig } from '../env.schema'
 import {
+  buscarPedidosMercadoLivreNaoIntegrados,
   PedidoMonitorado,
   registrarErroPedidos,
   salvarCheckpointPedidos,
   salvarPedidoMonitorado,
 } from '../repositories/pedidos.repository'
+import { userIdDoPedidoMercadoLivre } from '../utils/reenvio-rotas'
 
 const espera = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 const diaMs = 24 * 60 * 60 * 1000
@@ -63,6 +65,7 @@ async function sincronizarConta(credencial: any): Promise<{ pedidos: number; cur
   let total = 0
   let paginas = 0
   let totalApi = 0
+  let avisouSemUserId = false
 
   console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Iniciando conta', {
     clienteId: credencial.clienteId,
@@ -95,8 +98,16 @@ async function sincronizarConta(credencial: any): Promise<{ pedidos: number; cur
     })
 
     for (const pedido of pagina.results) {
+      const userIdPedido = userIdDoPedidoMercadoLivre(pedido.seller?.id, credencial.clienteId)
+      if (!userIdPedido.veioDoPedido && !avisouSemUserId) {
+        avisouSemUserId = true
+        console.warn('[MERCADOLIVRE][PEDIDOS][SYNC] Pedido sem userId; usando a credencial', {
+          pedido: pedido.id,
+          clienteId: credencial.clienteId,
+        })
+      }
       const tipo = await consultarTipoLogistico(pedido.shipping?.id == null ? null : String(pedido.shipping.id), credencial, tokens)
-      await salvarPedidoMonitorado(credencial.clienteId, pedido, tipo)
+      await salvarPedidoMonitorado(userIdPedido.userId, pedido, tipo)
       total++
     }
     offset += pagina.results.length
@@ -114,7 +125,6 @@ export async function sincronizarPedidosMercadoLivre(): Promise<void> {
     lojas: contas.length,
     clienteIds: contas,
     dias: mercadolivreConfig.MERCADOLIVRE_ORDERS_TO_FETCH,
-    observacao: 'Somente grava tmp_order/tmp_order_items. Reenvio e Google Chat rodam no cron de notas.',
   })
 
   let falhas = 0
@@ -150,11 +160,29 @@ export async function sincronizarPedidosMercadoLivre(): Promise<void> {
     }
   }
 
+  const naoIntegrados = await buscarPedidosMercadoLivreNaoIntegrados()
+  console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Comparação com Nérus (eordchannelp)', {
+    naoIntegrados: naoIntegrados.length,
+    porLoja: Object.fromEntries(
+      [...new Map(naoIntegrados.map(p => [p.cliente_id, 0])).keys()].map(clienteId => [
+        clienteId,
+        naoIntegrados.filter(p => p.cliente_id === clienteId).length,
+      ]),
+    ),
+    exemplos: naoIntegrados.slice(0, 10).map(p => ({
+      clienteId: p.cliente_id,
+      pedido: p.pedido_id,
+      status: p.status,
+      data: p.data_criacao,
+    })),
+  })
+
   console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Monitoramento multi-loja finalizado', {
     lojas: contas.length,
     sucessos,
     falhas,
     pedidosTotal,
+    naoIntegrados: naoIntegrados.length,
   })
 
   if (falhas) throw new Error(`Monitoramento de pedidos ML falhou em ${falhas} conta(s); erros registrados no checkpoint`)

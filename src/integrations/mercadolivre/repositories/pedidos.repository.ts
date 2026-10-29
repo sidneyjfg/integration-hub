@@ -9,6 +9,7 @@ export type PedidoMonitorado = {
   currency_id?: string | null
   total_amount?: number | string | null
   shipping?: { id?: string | number | null } | null
+  seller?: { id?: string | number | null } | null
   order_items?: Array<{
     item?: { id?: string | null; title?: string | null; variation_id?: string | number | null } | null
     quantity?: number | string | null
@@ -71,6 +72,29 @@ export async function salvarPedidoMonitorado(clienteId: string, pedido: PedidoMo
   } finally {
     conexao.release()
   }
+}
+
+export async function buscarUserIdsPorPedidos(pedidoIds: string[]): Promise<Map<string, string>> {
+  const mapa = new Map<string, string>()
+  if (!pedidoIds.length) return mapa
+
+  const placeholders = pedidoIds.map(() => '?').join(', ')
+  const [rows] = await poolMonitoramento.query(
+    `SELECT pedido_id, cliente_id
+       FROM tmp_order
+      WHERE origem = ?
+        AND pedido_id IN (${placeholders})`,
+    [ORIGEM, ...pedidoIds],
+  )
+
+  for (const row of rows as Array<{ pedido_id?: string | number; cliente_id?: string | number }>) {
+    const pedidoId = String(row.pedido_id ?? '')
+    const userId = String(row.cliente_id ?? '').trim()
+    if (!pedidoId || !userId || mapa.has(pedidoId)) continue
+    mapa.set(pedidoId, userId)
+  }
+
+  return mapa
 }
 
 export async function listarPedidosMonitorados(limite = 100): Promise<any[]> {

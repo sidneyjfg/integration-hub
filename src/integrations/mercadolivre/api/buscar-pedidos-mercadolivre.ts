@@ -6,6 +6,7 @@ import {
   salvarValorPedido,
   MercadoLivreCredential,
 } from '../repositories/mercadolivre-notas.repository'
+import { userIdDoPedidoMercadoLivre } from '../utils/reenvio-rotas'
 
 type PedidoMercadoLivre = {
   id: string
@@ -14,6 +15,7 @@ type PedidoMercadoLivre = {
   status?: string | null
   cancel_detail?: { code?: string | null } | null
   total_amount?: number | string | null
+  seller?: { id?: string | number | null } | null
   shipping?: { id?: string | number | null } | null
   order_items?: Array<{
     item?: { id?: string | null } | null
@@ -94,6 +96,18 @@ async function buscarPedidosDoPeriodo(
   }
   const pedidos: PedidoMercadoLivre[] = []
   let offset = 0
+  let avisouSemUserId = false
+  const comUserId = (pedido: PedidoMercadoLivre): PedidoMercadoLivre => {
+    const userIdPedido = userIdDoPedidoMercadoLivre(pedido.seller?.id, credencial.clienteId)
+    if (!userIdPedido.veioDoPedido && !avisouSemUserId) {
+      avisouSemUserId = true
+      console.warn('[MERCADOLIVRE][PEDIDOS][API] Pedido sem userId; usando a credencial', {
+        pedido: pedido.id,
+        sellerId: credencial.clienteId,
+      })
+    }
+    return { ...pedido, seller: { id: userIdPedido.userId } }
+  }
 
   while (true) {
     let paginaConcluida = false
@@ -144,7 +158,7 @@ async function buscarPedidosDoPeriodo(
         pedidos.push(...pagina.filter(pedido => {
           const fechamento = Date.parse(pedido.date_closed ?? '')
           return fechamento >= de && fechamento < ate
-        }))
+        }).map(comUserId))
         if (pagina.length === 0 || offset + pagina.length >= total) return pedidos
         offset += pagina.length
         // O endpoint de pedidos aplica rate limit por vendedor. Mesmo com
