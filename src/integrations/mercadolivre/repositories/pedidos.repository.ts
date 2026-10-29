@@ -1,4 +1,5 @@
 import { poolMonitoramento } from '../../../core/db'
+import { coreConfig } from '../../../core/env.schema'
 
 export type PedidoMonitorado = {
   id: string | number
@@ -95,6 +96,69 @@ export async function buscarUserIdsPorPedidos(pedidoIds: string[]): Promise<Map<
   }
 
   return mapa
+}
+
+export type PedidoMercadoLivreNaoIntegrado = {
+  cliente_id: string
+  pedido_id: string
+  pack_id: string | null
+  data_criacao: string | null
+  status: string | null
+  valor_total: number | null
+  tipo_logistico: string | null
+}
+
+/**
+ * Pedidos do ML em tmp_order que ainda não aparecem em eordchannelp.
+ * No ML o id do canal fica em ordnoChannel (índice i4), não em ordnoWeb.
+ */
+export async function buscarPedidosMercadoLivreNaoIntegrados(
+  clienteId?: string,
+): Promise<PedidoMercadoLivreNaoIntegrado[]> {
+  const lojas = coreConfig.STORENOS
+    .split(',')
+    .map(id => `'${id.trim()}'`)
+    .join(', ')
+
+  const filtroConta = clienteId ? 'AND t.cliente_id = ?' : ''
+  const params = clienteId ? [ORIGEM, clienteId] : [ORIGEM]
+
+  // CAST: pedido_id é VARCHAR e ordnoChannel é numérico; sem cast o MySQL
+  // não usa o índice i4 (ordnoChannel, channel) e a comparação fica lenta.
+  const sql = `
+    SELECT
+      t.cliente_id,
+      t.pedido_id,
+      t.pack_id,
+      DATE_FORMAT(t.data_criacao, '%d/%m/%Y %H:%i:%s') AS data_criacao,
+      t.status,
+      t.valor_total,
+      t.tipo_logistico
+    FROM ${coreConfig.DB_NAME_MONITORAMENTO}.tmp_order t
+    WHERE t.origem = ?
+      ${filtroConta}
+      AND NOT EXISTS (
+        SELECT 1
+          FROM ${coreConfig.DB_NAME_DADOS}.eordchannelp e
+         WHERE e.ordnoChannel = CAST(t.pedido_id AS UNSIGNED)
+           AND e.storeno IN (${lojas})
+      )
+    ORDER BY t.data_criacao DESC
+  `
+
+  console.log('[MERCADOLIVRE][PEDIDOS][DB] Buscando pedidos não integrados', {
+    clienteId: clienteId ?? 'todas',
+  })
+
+  const [rows] = await poolMonitoramento.query(sql, params)
+  const resultado = rows as PedidoMercadoLivreNaoIntegrado[]
+
+  console.log('[MERCADOLIVRE][PEDIDOS][DB] Pedidos não integrados', {
+    clienteId: clienteId ?? 'todas',
+    total: resultado.length,
+  })
+
+  return resultado
 }
 
 export async function listarPedidosMonitorados(limite = 100): Promise<any[]> {

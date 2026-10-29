@@ -393,8 +393,7 @@ export async function buscarNotasNaoIntegradasNerusPorChaves(
 
 /**
  * Retorna os pedidos das notas ainda não integradas que não aparecem no
- * vínculo do ERP. A consulta fica limitada às chaves da conta/ciclo e usa
- * ordnoweb (índice já usado pelos demais hubs) para não varrer o histórico.
+ * vínculo do ERP. No ML o id do canal fica em ordnoChannel (índice i4).
  */
 export async function buscarPedidosPendentesPorChavesNotas(
   chaves: string[]
@@ -415,7 +414,7 @@ export async function buscarPedidosPendentesPorChavesNotas(
        AND NOT EXISTS (
          SELECT 1
            FROM ${coreConfig.DB_NAME_DADOS}.eordchannelp e
-          WHERE e.ordnoweb = TRIM(t.venda_remesa)
+          WHERE e.ordnoChannel = CAST(TRIM(t.venda_remesa) AS UNSIGNED)
             AND e.storeno IN (${lojas})
        )
      ORDER BY pedido

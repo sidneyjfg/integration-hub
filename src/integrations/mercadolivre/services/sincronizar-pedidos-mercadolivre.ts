@@ -161,7 +161,7 @@ export async function sincronizarPedidosMercadoLivre(): Promise<void> {
   }
 
   const naoIntegrados = await buscarPedidosMercadoLivreNaoIntegrados()
-  console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Comparação com Nérus (eordchannelp)', {
+  console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Comparação com Nérus (eordchannelp.ordnoChannel)', {
     naoIntegrados: naoIntegrados.length,
     porLoja: Object.fromEntries(
       [...new Map(naoIntegrados.map(p => [p.cliente_id, 0])).keys()].map(clienteId => [
