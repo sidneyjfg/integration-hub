@@ -103,10 +103,15 @@ export async function executarCronEtiqueta() {
 
 let pedidosMLRunning = false
 export async function executarCronPedidos() {
-  if (pedidosMLRunning) return
+  if (pedidosMLRunning) {
+    console.warn('[MERCADOLIVRE][PEDIDOS][CRON] Execução anterior ainda em andamento; ciclo ignorado')
+    return
+  }
   pedidosMLRunning = true
   try {
+    console.log('[MERCADOLIVRE][PEDIDOS][CRON] Iniciando ciclo de monitoramento de pedidos')
     await sincronizarPedidosMercadoLivre()
+    console.log('[MERCADOLIVRE][PEDIDOS][CRON] Ciclo concluído')
   } finally {
     pedidosMLRunning = false
   }

@@ -54,12 +54,22 @@ async function consultarTipoLogistico(shippingId: string | null, credencial: any
   return shipment.logistic?.type ?? shipment.logistic_type ?? null
 }
 
-async function sincronizarConta(credencial: any): Promise<{ pedidos: number; cursor: string }> {
+async function sincronizarConta(credencial: any): Promise<{ pedidos: number; cursor: string; paginas: number; totalApi: number }> {
   const agora = new Date()
-  const inicio = new Date(agora.getTime() - mercadolivreConfig.MERCADOLIVRE_ORDERS_TO_FETCH * diaMs)
+  const dias = mercadolivreConfig.MERCADOLIVRE_ORDERS_TO_FETCH
+  const inicio = new Date(agora.getTime() - dias * diaMs)
   const tokens = new Map<string, string>()
   let offset = 0
   let total = 0
+  let paginas = 0
+  let totalApi = 0
+
+  console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Iniciando conta', {
+    clienteId: credencial.clienteId,
+    dias,
+    de: inicio.toISOString(),
+    ate: agora.toISOString(),
+  })
 
   while (true) {
     const pagina = await requisitar<RespostaPedidos>('https://api.mercadolibre.com/orders/search', {
@@ -74,29 +84,59 @@ async function sincronizarConta(credencial: any): Promise<{ pedidos: number; cur
       throw new Error(`Resposta inválida de pedidos para a conta ${credencial.clienteId}`)
     }
 
+    paginas++
+    totalApi = Number(pagina.paging?.total)
+    console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Página recebida', {
+      clienteId: credencial.clienteId,
+      pagina: paginas,
+      offset,
+      recebidos: pagina.results.length,
+      totalApi,
+    })
+
     for (const pedido of pagina.results) {
       const tipo = await consultarTipoLogistico(pedido.shipping?.id == null ? null : String(pedido.shipping.id), credencial, tokens)
       await salvarPedidoMonitorado(credencial.clienteId, pedido, tipo)
       total++
     }
     offset += pagina.results.length
-    if (offset >= Number(pagina.paging?.total) || pagina.results.length === 0) break
+    if (offset >= totalApi || pagina.results.length === 0) break
     await espera(1200)
   }
 
-  return { pedidos: total, cursor: agora.toISOString() }
+  return { pedidos: total, cursor: agora.toISOString(), paginas, totalApi }
 }
 
 export async function sincronizarPedidosMercadoLivre(): Promise<void> {
   const credenciais = await buscarCredenciaisMercadoLivre()
+  const contas = credenciais.map(c => String(c.clienteId))
+  console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Início monitoramento multi-loja', {
+    lojas: contas.length,
+    clienteIds: contas,
+    dias: mercadolivreConfig.MERCADOLIVRE_ORDERS_TO_FETCH,
+    observacao: 'Somente grava tmp_order/tmp_order_items. Reenvio e Google Chat rodam no cron de notas.',
+  })
+
   let falhas = 0
-  for (const credencial of credenciais) {
+  let sucessos = 0
+  let pedidosTotal = 0
+
+  for (const [indice, credencial] of credenciais.entries()) {
+    console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Processando loja', {
+      indice: indice + 1,
+      de: credenciais.length,
+      clienteId: credencial.clienteId,
+    })
     try {
       const resultado = await sincronizarConta(credencial)
       await salvarCheckpointPedidos(credencial.clienteId, resultado.cursor, null)
+      sucessos++
+      pedidosTotal += resultado.pedidos
       console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Conta sincronizada', {
         clienteId: credencial.clienteId,
         pedidos: resultado.pedidos,
+        paginas: resultado.paginas,
+        totalApi: resultado.totalApi,
         cursor: resultado.cursor,
       })
     } catch (error: any) {
@@ -109,5 +149,13 @@ export async function sincronizarPedidosMercadoLivre(): Promise<void> {
       })
     }
   }
+
+  console.log('[MERCADOLIVRE][PEDIDOS][SYNC] Monitoramento multi-loja finalizado', {
+    lojas: contas.length,
+    sucessos,
+    falhas,
+    pedidosTotal,
+  })
+
   if (falhas) throw new Error(`Monitoramento de pedidos ML falhou em ${falhas} conta(s); erros registrados no checkpoint`)
 }
